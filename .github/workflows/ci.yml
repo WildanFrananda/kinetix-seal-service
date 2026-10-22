@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: The gate, in the toolchain the laptop runs
+        run: sh bin/dev bin/ci
+
+      - if: always()
+        run: sh bin/dev down
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: The production image builds
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: kinetix-seal-service:ci
+          build-args: |
+            KINETIX_SEAL_SERVICE_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          provenance: false
+
+      - name: The image runs as a user, carries no secret and knows its build
+        run: |
+          user="$(docker image inspect -f '{{.Config.User}}' kinetix-seal-service:ci)"
+          [ "$user" = node ] || { echo "the image runs as '$user'"; exit 1; }
+          if docker run --rm --entrypoint sh kinetix-seal-service:ci -c 'ls -a / /app' | grep -qE '^\.(git|env)$'; then
+            echo "the image carries .git or .env"
+            exit 1
+          fi
+          [ "$(docker run --rm --entrypoint printenv kinetix-seal-service:ci KINETIX_SEAL_SERVICE_VERSION)" = "${{ github.sha }}" ]
+          docker run --rm --entrypoint sh kinetix-seal-service:ci -c 'test -x "$(ls node_modules/@prisma/engines/schema-engine-* | head -n 1)"'
+
+  verify:
+    needs: [gate, image]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: The gate and the image both passed
+        run: test "${{ needs.gate.result }}" = success && test "${{ needs.image.result }}" = success

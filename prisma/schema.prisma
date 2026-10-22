@@ -1,0 +1,22 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/infrastructure/postgres/generated"
+  runtime      = "nodejs"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model SponsorEvent {
+  id          BigInt   @id @default(autoincrement())
+  occurredAt  DateTime @map("occurred_at") @db.Timestamptz(6)
+  condition   String   @db.VarChar(16)
+  dustBalance Decimal  @map("dust_balance") @db.Decimal(39, 0)
+  dustCoins   Int      @map("dust_coins")
+  nightUtxos  Int      @map("night_utxos")
+
+  @@index([occurredAt])
+  @@map("sponsor_events")
+}

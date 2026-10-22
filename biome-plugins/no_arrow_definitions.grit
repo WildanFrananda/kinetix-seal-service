@@ -1,0 +1,11 @@
+language js
+
+or {
+  JsVariableDeclarator(id = $name, initializer = JsInitializerClause(expression = JsArrowFunctionExpression())),
+  JsPropertyClassMember(name = $name, value = JsInitializerClause(expression = JsArrowFunctionExpression())),
+  JsAssignmentExpression(left = $name, right = JsArrowFunctionExpression()),
+  JsAssignmentExpression(left = $name, right = JsParenthesizedExpression(expression = JsArrowFunctionExpression())),
+  JsAssignmentExpression(left = $name, right = TsAsExpression(expression = JsParenthesizedExpression(expression = JsArrowFunctionExpression())))
+} where {
+  register_diagnostic(span = $name, message = "Define a function with the function keyword; an arrow function is only for an anonymous callback")
+}

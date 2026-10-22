@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+: "${KINETIX_SEAL_TEST_DATABASE_URL:?bin/test runs the database tests too: run it as bin/dev bin/test}"
+
+cd "$(dirname "$0")/.."
+
+node --test --test-reporter=spec --experimental-test-coverage "dist/tests/**/*.test.js"

@@ -1,0 +1,36 @@
+include:
+  - project: 'WildanFrananda/kinetix-infrastructure'
+    ref: main
+    file: '/ci/service-ci.yml'
+
+stages:
+  - verify
+  - build
+  - test
+
+variables:
+  PRISMA_HIDE_UPDATE_MESSAGE: "1"
+  KINETIX_SEAL_TEST_DATABASE_URL: postgresql://ci:ci-ephemeral-not-a-deployed-credential@postgres:5432/kinetix_seal_test
+
+secret-scan:
+  extends: .secret-scan
+
+build-image:
+  extends: .build-image
+
+verify:
+  image: node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+  stage: test
+  services:
+    - name: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+      alias: postgres
+      variables:
+        POSTGRES_USER: ci
+        POSTGRES_PASSWORD: ci-ephemeral-not-a-deployed-credential
+        POSTGRES_DB: kinetix_seal_test
+        POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+  script:
+    - sh bin/ci
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

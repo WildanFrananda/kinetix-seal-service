@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+if [ "${1:-}" = "down" ]; then
+  exec docker compose -f toolchain/compose.yaml down --volumes
+fi
+
+if [ -t 0 ] && [ -t 1 ]; then
+  exec docker compose -f toolchain/compose.yaml run --rm toolchain "$@"
+fi
+
+exec docker compose -f toolchain/compose.yaml run --rm -T toolchain "$@"

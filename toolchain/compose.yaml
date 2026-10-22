@@ -1,0 +1,35 @@
+name: kinetix-seal-toolchain
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    environment:
+      POSTGRES_USER: ci
+      POSTGRES_PASSWORD: ci-ephemeral-not-a-deployed-credential
+      POSTGRES_DB: kinetix_seal_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ci -d kinetix_seal_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  toolchain:
+    image: node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+    working_dir: /workspace
+    environment:
+      npm_config_cache: /npm-cache
+      PRISMA_HIDE_UPDATE_MESSAGE: "1"
+      KINETIX_SEAL_TEST_DATABASE_URL: postgresql://ci:ci-ephemeral-not-a-deployed-credential@postgres:5432/kinetix_seal_test
+    volumes:
+      - ..:/workspace
+      - node_modules:/workspace/node_modules
+      - npm_cache:/npm-cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  node_modules:
+  npm_cache:

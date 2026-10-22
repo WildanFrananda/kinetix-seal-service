@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+: "${KINETIX_SEAL_TEST_DATABASE_URL:?bin/ci needs the toolchain test database: run it as bin/dev bin/ci}"
+
+cd "$(dirname "$0")/.."
+
+npm ci --ignore-scripts
+npx prisma generate
+npx biome ci --colors=off .
+npx tsc -p tsconfig.json
+
+export KINETIX_SEAL_DATABASE_URL="$KINETIX_SEAL_TEST_DATABASE_URL"
+
+npx prisma migrate deploy
+
+if ! npx prisma migrate deploy | grep -q "No pending migrations to apply"; then
+  echo "a second migrate deploy applied something: the migrations are not idempotent" >&2
+  exit 1
+fi
+
+npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+
+sh bin/test

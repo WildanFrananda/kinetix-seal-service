@@ -1,0 +1,15 @@
+.git
+.github
+.gitlab-ci.yml
+node_modules
+dist
+coverage
+src/infrastructure/postgres/generated
+toolchain
+tests
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.md

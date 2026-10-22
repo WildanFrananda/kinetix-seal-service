@@ -1,0 +1,13 @@
+language js
+
+JsExport(export_clause = $clause) where {
+  $clause <: or {
+    JsFunctionDeclaration(),
+    JsClassDeclaration(),
+    JsVariableDeclarationClause(),
+    TsTypeAliasDeclaration(),
+    TsInterfaceDeclaration(),
+    TsDeclareFunctionDeclaration()
+  },
+  register_diagnostic(span = $clause, message = "Declare it without export, and export it in the export list at the bottom of the file")
+}
