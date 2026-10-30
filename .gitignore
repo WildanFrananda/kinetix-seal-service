@@ -1,5 +1,6 @@
 node_modules/
 dist/
+managed/
 coverage/
 src/infrastructure/postgres/generated/
 .env

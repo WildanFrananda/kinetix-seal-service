@@ -1,0 +1,11 @@
+{
+  "name": "kinetix-seal-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@openzeppelin/compact-contracts": "0.3.0"
+  },
+  "overrides": {
+    "ansi-regex": "6.4.0"
+  }
+}

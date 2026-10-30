@@ -13,7 +13,8 @@ first contract to watch.
 ## Everything runs in Docker
 
 Nothing is installed on the laptop. `bin/dev` runs a command in the toolchain (`toolchain/compose.yaml`:
-Node 26.12.1 and a throwaway Postgres 16). Both are pinned by digest.
+Node 26.12.1 with the Compact compiler, and a throwaway Postgres 16). Both are pinned by digest, and the
+compiler's zip by its SHA-256 (`toolchain/compactc.sha256`).
 
 ```sh
 bin/dev bin/ci          # the whole gate, the same one CI runs
@@ -22,10 +23,10 @@ bin/dev npx biome check --write .
 bin/dev down            # stop the toolchain and drop its volumes
 ```
 
-`bin/ci` installs with `npm ci --ignore-scripts`, generates the Prisma client, runs Biome and `tsc`, then
-migrates the test database twice: the second run must apply nothing. It then compares the database with
-`prisma/schema.prisma`, which must show no drift, and runs every test. It refuses to start without the
-toolchain's database: a skipped database test proves nothing.
+`bin/ci` installs with `npm ci --ignore-scripts`, generates the Prisma client, compiles the contracts
+(`bin/contracts`), runs Biome and `tsc`, then migrates the test database twice: the second run must apply
+nothing. It then compares the database with `prisma/schema.prisma`, which must show no drift, and runs every
+test. It refuses to start without the toolchain's database: a skipped database test proves nothing.
 
 ## Layout, and the rule it encodes
 
@@ -105,6 +106,89 @@ toolchain's database: a skipped database test proves nothing.
 - **Fees** were 0 to 1 SPECK per transaction on Preprod (2026-10-21). `additionalFeeOverhead` is 1,000 SPECK,
   as in the official example: the overhead is paid on every transaction.
 
+## Contracts
+
+`contracts/` is a project of its own, as `kinetix-notary-service/contracts/` is for Solidity:
+
+```
+contracts/
+  package.json, package-lock.json      the Compact dependencies, pinned with integrity hashes
+  src/<feature>/<Feature>.compact      the deployable contract, which composes the modules
+  src/<feature>/<Module>.compact       one module per concern, and one struct per file
+```
+
+- **`bin/contracts`** installs `contracts/node_modules` (`npm ci`, scripts off), then compiles each
+  `src/<feature>/<Feature>.compact` into `managed/<feature>/` with `compactc` 0.31.1, with
+  `COMPACT_PATH=contracts/node_modules` so libraries are imported by package path. `managed/` holds the
+  TypeScript contract, the ZKIR and the proving keys: a build output, never committed. Code imports it as
+  `#contracts/<feature>/contract/index.js`, through `package.json`'s `imports`, so the same path works from
+  `src/`, `tests/` and `dist/`.
+- **OpenZeppelin Contracts for Compact** (`@openzeppelin/compact-contracts`, MIT) is the library, as
+  OpenZeppelin's Solidity contracts are notary's. 0.3.0 targets ledger 8 and compiler 0.31.0 and was audited in
+  August and October 2026; pre-releases (`-alpha`, `-rc`) are unaudited and never used. It ships no witnesses:
+  every witness here is ours. 0.3.0 was ten days old when the user asked for it (2026-10-30, *"oke tolong
+  gunakan"*), inside the two-week rule; its `Pausable` is identical to 0.3.0-rc.2, which the October audit
+  covers, and the package carries npm provenance. Its CLI dependency drags `ansi-regex`, pinned to 6.4.0 by
+  `overrides` because 6.5.0 was a day old.
+- **The compiler is pinned.** Under SEAL-D10 the holder key and the leaf are `transientHash`, which may change
+  between compiler versions, so a compiler change is a new contract generation (`SEAL-SERVICE.md` §6.4).
+- **Keys are generated in CI or in the image build** (the Dockerfile's `contracts` stage, on the build
+  platform), never on the VPS: `zkir` dies with SIGILL on a CPU without ADX. Key generation downloads the
+  public parameters into `MIDNIGHT_PP` (the toolchain's `zk_params` volume, a build cache in Docker).
+
+### Compact house style
+
+- **Every file starts with `// SPDX-License-Identifier: MIT`**, as every Solidity file does: the single
+  comment allowed (the user, 2026-10-30, *"kalau emang harus pasang lisensi kaya solidity boleh pasang MIT"*).
+  `compactc` does not ask for it; notary's `.sol` files carry it because solc warns. Nothing else is a comment.
+- **Exports sit at the bottom**, in one `export { … };` block, in the contract and in every module (the user,
+  2026-10-30, *"di kode compact nya bisa export nya ngga inline ga?"*). The compiled contract, its
+  `contract-info.json` and its ZKIR were compared byte for byte against the inline form: identical.
+- **Modules are imported without a prefix**, so their ledger fields, witnesses and circuits keep their own
+  names in the TypeScript contract. Libraries are imported with one (`prefix Pausable_;`), so their names say
+  where they come from: `Pausable__isPaused`.
+- **A module never imports another stateful module.** Composition happens in the deployable contract. The
+  compiler duplicates the state of a module reached twice (LFDT-Minokawa/compact#270, OpenZeppelin's note in
+  `Initializable`). A struct-only module may be imported anywhere.
+- **`_name` is an unguarded building block** (OpenZeppelin's convention): `_issue`, `_approvePredicate`. Only
+  the deployable contract calls it, after `assertIssuer()`. A name without the underscore guards itself.
+- English only, and every value written to the ledger passes through `disclose`.
+
+### Testing
+
+- **The circuits run in memory** (`tests/infrastructure/midnight/in_memory_credential_registry.ts`): the
+  unproven deploy and call builders of midnight-js execute each circuit against a real contract state, with
+  no proof and no network. A failed `assert` carries its message in the error. An error thrown by a witness
+  arrives wrapped in `ContractRuntimeError: Error executing circuit '…'`, with the witness's error as its
+  `cause`.
+- **`present` must stay at k=12** (a test reads its ZKIR): that is what keeps a phone at about a minute
+  (SEAL-D11). A change that grows it is a decision for the user, not a refactor.
+
+### The credential registry (S1)
+
+`contracts/src/credential_registry/`:
+
+| file | holds |
+| --- | --- |
+| `CredentialRegistry.compact` | the deployable contract: the constructor, `issue`, `revoke`, `approvePredicate`, `withdrawPredicate`, `pause`, `unpause`, `present` |
+| `IssuerAuthority.compact` | `issuerPk`, `proposedIssuerPk`, the `issuerSecret` witness, `assertIssuer`, and the two-step `proposeIssuer`/`acceptIssuer` |
+| `IssuedCredentials.compact` | `issued`, a `HistoricMerkleTree<20, Bytes<32>>` of leaves: `_issue`, `_revoke`, `assertIssued` |
+| `ApprovedPredicates.compact` | `predicates`, keyed by `predicateId` (`persistentHash` of the content): `_approvePredicate`, `_withdrawPredicate`, `approvedPredicate` |
+| `Presentations.compact` | `presentations`, challenge to predicate id: `assertUnanswered`, `_recordPresentation` |
+| `Holder.compact` | the holder's witnesses, `holderPublicKey` and `credentialLeaf` (`transientHash`, SEAL-D10) |
+| `Credential`, `CredentialLeaf`, `Predicate`, `PredicateKey` | one struct each |
+
+- **Predicates are ledger rows the issuer approves** (G3's finding: free minimums let a verifier probe a holder's
+  exact values). A content-addressed id can never come to mean other minimums. `present(challenge, id)` proves
+  against the row and records `challenge → id`. Withdrawing a predicate refuses new presentations and leaves the
+  recorded ones readable.
+- **Revocation** writes the default leaf at the index and resets the tree's history, so only the current root
+  proves. There is no revoked set: checking one would put the leaf in the public transcript.
+- **Pause** (OpenZeppelin's `Pausable`, by the issuer) stops `issue`, `approvePredicate` and `present`. It
+  never stops what an incident needs: `revoke`, `withdrawPredicate` and the issuer hand-over still work.
+- **Witnesses** (`src/infrastructure/midnight/credential_registry_witnesses.ts`) refuse a secret to the wrong
+  role: the issuer's private state answers only `issuerSecret`; a holder's answers the rest.
+
 ## Prisma
 
 - Prisma ORM 7.10.0 with `@prisma/adapter-pg`. The `prisma-client` generator writes TypeScript into
@@ -141,5 +225,6 @@ toolchain's database: a skipped database test proves nothing.
 - The gRPC server, the mesh certificate and the per-RPC allow list: these come with S1's first RPC in
   `kinetix-contracts` (`seal.v1`).
 - The watcher on the indexer's contract actions, and the generations table.
-- The Compact toolchain stage and `contracts/`: the spike's `credential_registry` moves here with S1.
+- The registry's deployment, issuance from matching's and review's facts, the verifier page and the holder's
+  page: the rest of S1. The contract and its tests exist; nothing deploys it yet.
 - The features: S1 credentials, S2 sealed-bid auctions, S3 anonymous reports.

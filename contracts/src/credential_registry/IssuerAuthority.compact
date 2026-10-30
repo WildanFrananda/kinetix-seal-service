@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module IssuerAuthority {
+  import CompactStandardLibrary;
+
+  ledger issuerPk: Bytes<32>;
+  ledger proposedIssuerPk: Maybe<Bytes<32>>;
+
+  witness issuerSecret(): Bytes<32>;
+
+  pure circuit issuerPublicKey(secret: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<2, Bytes<32>>>([pad(32, "kinetix:seal:issuer"), secret]);
+  }
+
+  circuit initializeIssuer(initialIssuerPk: Bytes<32>): [] {
+    issuerPk = disclose(initialIssuerPk);
+  }
+
+  circuit assertIssuer(): [] {
+    assert(issuerPublicKey(issuerSecret()) == issuerPk, "not the issuer");
+  }
+
+  circuit proposeIssuer(nextIssuerPk: Bytes<32>): [] {
+    assertIssuer();
+    proposedIssuerPk = some<Bytes<32>>(disclose(nextIssuerPk));
+  }
+
+  circuit acceptIssuer(): [] {
+    assert(proposedIssuerPk.is_some, "no issuer was proposed");
+    assert(issuerPublicKey(issuerSecret()) == proposedIssuerPk.value, "not the proposed issuer");
+    issuerPk = proposedIssuerPk.value;
+    proposedIssuerPk = none<Bytes<32>>();
+  }
+
+  export {
+    issuerPk,
+    proposedIssuerPk,
+    issuerSecret,
+    issuerPublicKey,
+    initializeIssuer,
+    assertIssuer,
+    proposeIssuer,
+    acceptIssuer
+  };
+}

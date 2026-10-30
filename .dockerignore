@@ -2,10 +2,13 @@
 .github
 .gitlab-ci.yml
 node_modules
+contracts/node_modules
 dist
+managed
 coverage
 src/infrastructure/postgres/generated
 toolchain
+!toolchain/compactc.sha256
 tests
 .env
 .env.*

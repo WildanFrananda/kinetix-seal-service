@@ -8,7 +8,7 @@ if [ "${1:-}" = "down" ]; then
 fi
 
 if [ -t 0 ] && [ -t 1 ]; then
-  exec docker compose -f toolchain/compose.yaml run --rm toolchain "$@"
+  exec docker compose -f toolchain/compose.yaml run --build --rm toolchain "$@"
 fi
 
-exec docker compose -f toolchain/compose.yaml run --rm -T toolchain "$@"
+exec docker compose -f toolchain/compose.yaml run --build --rm -T toolchain "$@"

@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+npm ci --prefix contracts --ignore-scripts --no-audit --no-fund
+
+for directory in contracts/src/*/; do
+  name="$(basename "$directory")"
+  entry="$(printf '%s' "$name" | awk -F_ '{ for (i = 1; i <= NF; i++) printf "%s%s", toupper(substr($i, 1, 1)), substr($i, 2) }')"
+  rm -rf "managed/$name"
+  COMPACT_PATH="$PWD/contracts/node_modules" compactc "$directory$entry.compact" "managed/$name"
+done
