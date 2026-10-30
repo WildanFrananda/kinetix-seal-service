@@ -3,7 +3,7 @@ import type { WalletFacade } from "@midnightntwrk/wallet-sdk"
 
 import type { LoggerPort } from "../application/ports/logger.port.ts"
 import { readSealConfig } from "../infrastructure/config/read_seal_config.ts"
-import { sponsorSecrets } from "../infrastructure/midnight/sponsor_secrets.ts"
+import { sealSecrets } from "../infrastructure/midnight/seal_secrets.ts"
 import { startWalletFacade } from "../infrastructure/midnight/wallet_facade_factory.ts"
 import { deriveWalletKeys } from "../infrastructure/midnight/wallet_keys.ts"
 import { loadWalletState, saveWalletState, walletStateFile } from "../infrastructure/midnight/wallet_state_file.ts"
@@ -17,7 +17,7 @@ async function withAdminWallet(
 ): Promise<void> {
   const config = readSealConfig(process.env)
 
-  redactOutput(sponsorSecrets(config))
+  redactOutput(sealSecrets(config))
   setNetworkId(config.midnight.networkId)
 
   const logger = new JsonLogger(`kinetix-seal-${command}`, config.logLevel, (line) => {

@@ -74,6 +74,7 @@ RUN npm ci --omit=dev --ignore-scripts \
 
 COPY --from=build /app/node_modules/@prisma/engines/ ./node_modules/@prisma/engines/
 COPY --from=build /app/dist ./dist
+COPY --from=contracts /app/managed ./managed
 COPY prisma.config.ts ./
 COPY prisma ./prisma
 

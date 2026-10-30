@@ -9,10 +9,13 @@ type SealConfig = {
   databaseUrl: string
   blockfrostProjectId: string
   sponsorMnemonic: string
+  issuerSecret: Uint8Array
   midnight: MidnightEndpoints
   walletStateDir: string
   sponsorMonitorSeconds: number
   walletCheckpointSeconds: number
+  registryCheckSeconds: number
+  midnightStepSeconds: number
   shutdownGraceSeconds: number
   sponsorThresholds: SponsorThresholds
 }

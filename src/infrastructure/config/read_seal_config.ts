@@ -15,6 +15,7 @@ function readSealConfig(env: NodeJS.ProcessEnv): SealConfig {
     databaseUrl: read.url("KINETIX_SEAL_DATABASE_URL", ["postgresql:", "postgres:"]),
     blockfrostProjectId: read.text("KINETIX_SEAL_BLOCKFROST_PROJECT_ID"),
     sponsorMnemonic: read.text("KINETIX_SEAL_SPONSOR_MNEMONIC").toLowerCase().split(/\s+/).join(" "),
+    issuerSecret: read.hexBytes("KINETIX_SEAL_ISSUER_SECRET", 32),
     midnight: {
       networkId: read.text("KINETIX_SEAL_NETWORK_ID"),
       indexerHttpUrl: read.url("KINETIX_SEAL_INDEXER_HTTP_URL", ["https:"]),
@@ -25,6 +26,8 @@ function readSealConfig(env: NodeJS.ProcessEnv): SealConfig {
     walletStateDir: read.text("KINETIX_SEAL_WALLET_STATE_DIR"),
     sponsorMonitorSeconds: read.positiveInteger("KINETIX_SEAL_SPONSOR_MONITOR_SECONDS"),
     walletCheckpointSeconds: read.positiveInteger("KINETIX_SEAL_WALLET_CHECKPOINT_SECONDS"),
+    registryCheckSeconds: read.positiveInteger("KINETIX_SEAL_REGISTRY_CHECK_SECONDS"),
+    midnightStepSeconds: read.positiveInteger("KINETIX_SEAL_MIDNIGHT_STEP_SECONDS"),
     shutdownGraceSeconds: read.positiveInteger("KINETIX_SEAL_SHUTDOWN_GRACE_SECONDS"),
     sponsorThresholds: {
       minimumDustCoins: read.positiveInteger("KINETIX_SEAL_SPONSOR_MIN_DUST_COINS"),

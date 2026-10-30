@@ -10,6 +10,7 @@ const complete: NodeJS.ProcessEnv = {
   KINETIX_SEAL_DATABASE_URL: "postgresql://kinetix_seal_app:secret@kinetix-seal-db:5432/kinetix_seal_dev",
   KINETIX_SEAL_BLOCKFROST_PROJECT_ID: "nightpreprodTEST",
   KINETIX_SEAL_SPONSOR_MNEMONIC: "  Word  word\tword ",
+  KINETIX_SEAL_ISSUER_SECRET: "a1".repeat(32),
   KINETIX_SEAL_NETWORK_ID: "preprod",
   KINETIX_SEAL_INDEXER_HTTP_URL: "https://midnight-preprod.blockfrost.io/api/v0",
   KINETIX_SEAL_INDEXER_WS_URL: "wss://midnight-preprod.blockfrost.io/api/v0/ws",
@@ -18,6 +19,8 @@ const complete: NodeJS.ProcessEnv = {
   KINETIX_SEAL_WALLET_STATE_DIR: "/var/lib/seal/wallet",
   KINETIX_SEAL_SPONSOR_MONITOR_SECONDS: "30",
   KINETIX_SEAL_WALLET_CHECKPOINT_SECONDS: "600",
+  KINETIX_SEAL_REGISTRY_CHECK_SECONDS: "600",
+  KINETIX_SEAL_MIDNIGHT_STEP_SECONDS: "300",
   KINETIX_SEAL_SHUTDOWN_GRACE_SECONDS: "25",
   KINETIX_SEAL_SPONSOR_MIN_DUST_COINS: "3",
   KINETIX_SEAL_SPONSOR_MIN_DUST: "100"
@@ -31,6 +34,20 @@ describe("reading the configuration", () => {
     assert.equal(config.sponsorMnemonic, "word word word")
     assert.equal(config.sponsorThresholds.minimumDust, 100n * 1_000_000_000_000_000n)
     assert.equal(config.midnight.nodeWsUrl, "wss://rpc.midnight-preprod.blockfrost.io")
+    assert.equal(config.issuerSecret.length, 32)
+    assert.equal(config.issuerSecret[0], 0xa1)
+  })
+
+  it("refuses an issuer secret that is not 32 bytes of lowercase hex, without printing it", () => {
+    for (const secret of ["a1".repeat(31), "A1".repeat(32), "zz".repeat(32)]) {
+      assert.throws(
+        () => readSealConfig({ ...complete, KINETIX_SEAL_ISSUER_SECRET: secret }),
+        (error: unknown) =>
+          error instanceof Error &&
+          error.message.includes("KINETIX_SEAL_ISSUER_SECRET must be 32 bytes of lowercase hex") &&
+          !error.message.includes(secret)
+      )
+    }
   })
 
   it("names every missing setting at once", () => {

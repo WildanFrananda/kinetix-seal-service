@@ -60,6 +60,22 @@ class SettingReader {
     return value
   }
 
+  hexBytes(name: string, length: number): Uint8Array {
+    const value = this.text(name)
+
+    if (value === "") {
+      return new Uint8Array(length)
+    }
+
+    if (!new RegExp(`^[0-9a-f]{${length * 2}}$`).test(value)) {
+      this.#invalid.push(`${name} must be ${length} bytes of lowercase hex`)
+
+      return new Uint8Array(length)
+    }
+
+    return Uint8Array.from(value.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16))
+  }
+
   verify(): void {
     const problems = [...this.#missing.map((name) => `${name} is required and has no default`), ...this.#invalid]
 

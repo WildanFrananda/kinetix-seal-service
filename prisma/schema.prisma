@@ -20,3 +20,21 @@ model SponsorEvent {
   @@index([occurredAt])
   @@map("sponsor_events")
 }
+
+model RegistryGeneration {
+  generation      Int       @id
+  contractAddress String    @unique @map("contract_address") @db.VarChar(128)
+  networkId       String    @map("network_id") @db.VarChar(32)
+  buildDigest     String    @map("build_digest") @db.Char(64)
+  status          String    @db.VarChar(16)
+  deployTxId      String?   @map("deploy_tx_id") @db.VarChar(160)
+  anchorHeight    BigInt?   @map("anchor_height")
+  anchorHash      String?   @map("anchor_hash") @db.Char(64)
+  retiredReason   String?   @map("retired_reason") @db.VarChar(32)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  activatedAt     DateTime? @map("activated_at") @db.Timestamptz(6)
+  retiredAt       DateTime? @map("retired_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@map("registry_generations")
+}
