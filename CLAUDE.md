@@ -230,6 +230,18 @@ contracts/
 - **Pinned exactly**, at least two weeks old, the lockfile resolved with
   `npm install --package-lock-only --ignore-scripts --before=<two weeks ago>`, inside the toolchain. No BSL,
   BUSL or FSL licences.
+- **Dependabot** (`.github/dependabot.yml`) opens its pull requests against `development`, like every
+  repository in the estate. It carries no comments, so its reasons are here:
+  - **A 14-day cooldown** on npm, the contracts' npm and GitHub Actions is the two-week rule, enforced. Security
+    updates are not delayed by it.
+  - **`@midnight-ntwrk/compact-runtime` is never updated by Dependabot.** It must be the runtime of the pinned
+    compiler: the compiled contract calls `checkRuntimeVersion('0.16.0')` and refuses any other.
+  - **No Midnight major** (`@midnight-ntwrk/*`, `@midnightntwrk/*`): midnight-js 5 and wallet SDK 2 are ledger 9.
+    The Midnight packages move together in one group, as they must.
+  - **`@openzeppelin/compact-contracts` stays below 0.4**, which targets ledger 9.
+  - Ledger 9 is one deliberate move, a new contract generation: infra `docs/MIGRATIONS.md` M12.
+  - Base images and the toolchain's Postgres take no major; the toolchain's own image is built here, not
+    pulled, so it is ignored. `@types/node` takes no major while the runtime is Node 26.
 - **Node 26.12.1 is the exception** to the two weeks: the user chose it for its security patch (2026-10-22). The
   wallet SDK documents Node 22.12+; the spike proved the proof bench and a wallet sync on 26, about 15% faster
   than on 22.

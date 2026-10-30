@@ -1,0 +1,121 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - "/"
+    target-branch: development
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Asia/Jakarta
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    groups:
+      midnight:
+        patterns:
+          - "@midnight-ntwrk/*"
+          - "@midnightntwrk/*"
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/*"
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "@midnight-ntwrk/compact-runtime"
+      - dependency-name: "@midnight-ntwrk/*"
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "@midnightntwrk/*"
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
+    commit-message:
+      prefix: "deps"
+  - package-ecosystem: npm
+    directories:
+      - "/contracts"
+    target-branch: development
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Asia/Jakarta
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    groups:
+      contracts:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "@openzeppelin/compact-contracts"
+        versions:
+          - ">= 0.4.0"
+    commit-message:
+      prefix: "deps(contracts)"
+  - package-ecosystem: docker
+    directories:
+      - "/"
+      - "/toolchain"
+    target-branch: development
+    schedule:
+      interval: daily
+      time: "07:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    groups:
+      base-images:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+    commit-message:
+      prefix: "deps(docker)"
+  - package-ecosystem: docker-compose
+    directories:
+      - "/toolchain"
+    target-branch: development
+    schedule:
+      interval: daily
+      time: "07:00"
+      timezone: Asia/Jakarta
+    open-pull-requests-limit: 5
+    groups:
+      toolchain-images:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+      - dependency-name: "kinetix-seal-toolchain"
+    commit-message:
+      prefix: "deps(toolchain)"
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+    target-branch: development
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Asia/Jakarta
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: "deps(actions)"
