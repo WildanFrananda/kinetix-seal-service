@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module Holder {
+  import CompactStandardLibrary;
+  import "Credential";
+  import "CredentialLeaf";
+
+  witness holderSecret(): Bytes<32>;
+  witness heldCredential(): Credential;
+  witness credentialPath(leaf: Bytes<32>): MerkleTreePath<20, Bytes<32>>;
+
+  pure circuit holderPublicKey(secret: Bytes<32>): Field {
+    return transientHash<Vector<2, Bytes<32>>>([pad(32, "kinetix:seal:holder"), secret]);
+  }
+
+  pure circuit credentialLeaf(credential: Credential, holder: Field): Bytes<32> {
+    return upgradeFromTransient(
+      transientHash<CredentialLeaf>(CredentialLeaf {
+        domain: pad(32, "kinetix:seal:credential"),
+        credential: credential,
+        holder: holder
+      })
+    );
+  }
+
+  export {
+    holderSecret,
+    heldCredential,
+    credentialPath,
+    holderPublicKey,
+    credentialLeaf
+  };
+}

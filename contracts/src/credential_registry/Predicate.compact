@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module Predicate {
+  import CompactStandardLibrary;
+
+  struct Predicate {
+    classId: Bytes<32>;
+    minimums: Vector<4, Uint<64>>;
+  }
+
+  export { Predicate };
+}

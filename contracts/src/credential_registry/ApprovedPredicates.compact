@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module ApprovedPredicates {
+  import CompactStandardLibrary;
+  import "Predicate";
+  import "PredicateKey";
+
+  ledger predicates: Map<Bytes<32>, Predicate>;
+
+  pure circuit predicateId(predicate: Predicate): Bytes<32> {
+    return persistentHash<PredicateKey>(PredicateKey {
+      domain: pad(32, "kinetix:seal:predicate"),
+      predicate: predicate
+    });
+  }
+
+  circuit _approvePredicate(predicate: Predicate): [] {
+    const id = predicateId(predicate);
+    assert(!predicates.member(disclose(id)), "the predicate is already approved");
+    predicates.insert(disclose(id), disclose(predicate));
+  }
+
+  circuit _withdrawPredicate(id: Bytes<32>): [] {
+    assert(predicates.member(disclose(id)), "the predicate is not approved");
+    predicates.remove(disclose(id));
+  }
+
+  circuit approvedPredicate(id: Bytes<32>): Predicate {
+    assert(predicates.member(disclose(id)), "the predicate is not approved");
+    return predicates.lookup(disclose(id));
+  }
+
+  export {
+    predicates,
+    predicateId,
+    _approvePredicate,
+    _withdrawPredicate,
+    approvedPredicate
+  };
+}

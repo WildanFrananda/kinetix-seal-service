@@ -7,6 +7,7 @@ cd "$(dirname "$0")/.."
 
 npm ci --ignore-scripts
 npx prisma generate
+sh bin/contracts
 npx biome ci --colors=off .
 npx tsc -p tsconfig.json
 

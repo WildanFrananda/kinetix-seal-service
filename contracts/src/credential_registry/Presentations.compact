@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module Presentations {
+  import CompactStandardLibrary;
+
+  ledger presentations: Map<Bytes<32>, Bytes<32>>;
+
+  circuit assertUnanswered(challenge: Bytes<32>): [] {
+    assert(!presentations.member(disclose(challenge)), "the challenge was already answered");
+  }
+
+  circuit _recordPresentation(challenge: Bytes<32>, id: Bytes<32>): [] {
+    presentations.insert(disclose(challenge), disclose(id));
+  }
+
+  export {
+    presentations,
+    assertUnanswered,
+    _recordPresentation
+  };
+}

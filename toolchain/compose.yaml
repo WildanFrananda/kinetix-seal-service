@@ -16,20 +16,27 @@ services:
       retries: 30
 
   toolchain:
-    image: node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+    build:
+      context: .
+    image: kinetix-seal-toolchain:local
     working_dir: /workspace
     environment:
       npm_config_cache: /npm-cache
+      MIDNIGHT_PP: /zk-params
       PRISMA_HIDE_UPDATE_MESSAGE: "1"
       KINETIX_SEAL_TEST_DATABASE_URL: postgresql://ci:ci-ephemeral-not-a-deployed-credential@postgres:5432/kinetix_seal_test
     volumes:
       - ..:/workspace
       - node_modules:/workspace/node_modules
+      - contracts_node_modules:/workspace/contracts/node_modules
       - npm_cache:/npm-cache
+      - zk_params:/zk-params
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   node_modules:
+  contracts_node_modules:
   npm_cache:
+  zk_params:
