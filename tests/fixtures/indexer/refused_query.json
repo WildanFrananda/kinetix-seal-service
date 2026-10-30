@@ -1,0 +1,9 @@
+{
+  "data": null,
+  "errors": [
+    {
+      "message": "Unknown field \"blok\" on type \"Query\". Did you mean \"block\"?",
+      "locations": [{ "line": 1, "column": 3 }]
+    }
+  ]
+}

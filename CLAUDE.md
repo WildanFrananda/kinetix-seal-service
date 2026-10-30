@@ -154,6 +154,26 @@ contracts/
   the deployable contract calls it, after `assertIssuer()`. A name without the underscore guards itself.
 - English only, and every value written to the ledger passes through `disclose`.
 
+### Registry generations (SEAL-D12, D13)
+
+- **The service deploys its own registry.** `RegistryGenerations` (`src/application/`) reconciles the
+  `registry_generations` table with the chain every `KINETIX_SEAL_REGISTRY_CHECK_SECONDS`, once the sponsor is
+  past `syncing`. The rule is a pure function, `src/domain/registry_generation_decision.ts`.
+- **The sponsor wallet pays** for every transaction seal makes itself, through the proof server
+  (`MidnightRegistryChain`). There is no second wallet.
+- **A generation is anchored to the block its deploy landed in.** A different hash at that height, or no block
+  there while the tip is below it and the contract has no state, means the chain was reset; it must be seen
+  twice in a row. A changed build digest (the SHA-256 of the verifier keys) means the contract was rebuilt.
+  Either retires the generation and deploys the next.
+- **Unknown is not an answer.** An indexer that fails or times out makes the check `unknown`, and the service
+  waits. Every network step has a deadline, `KINETIX_SEAL_MIDNIGHT_STEP_SECONDS`.
+- **A deploy is recorded before it is submitted** (`deploying`, with the contract address the unproven deploy
+  already knows). If it never confirms, the next check retires it as `interrupted` and deploys again; the
+  orphan, if it landed, costs one fee and holds nothing.
+- **The issuer secret** (`KINETIX_SEAL_ISSUER_SECRET`, 32 bytes of lowercase hex, in SOPS, one per environment)
+  is redacted from every output. The maintenance authority's signing key is derived from it and the generation
+  number, so nothing stores it: every change is a new generation anyway.
+
 ### Testing
 
 - **The circuits run in memory** (`tests/infrastructure/midnight/in_memory_credential_registry.ts`): the
