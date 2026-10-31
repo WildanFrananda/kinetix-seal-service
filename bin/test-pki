@@ -1,0 +1,45 @@
+#!/bin/sh
+set -eu
+
+cd "$(dirname "$0")/.."
+
+out="tests/fixtures/pki"
+
+rm -rf "$out"
+mkdir -p "$out"
+
+authority() {
+  mkdir -p "$out/$1"
+  step certificate create "$2" "$out/$1/ca.crt" "$out/$1/ca.key" \
+    --profile root-ca --no-password --insecure --not-after 24h >/dev/null 2>&1
+}
+
+leaf() {
+  name="$1"
+  authority="$2"
+  common_name="$3"
+  shift 3
+  mkdir -p "$out/$name"
+
+  sans=""
+  for san in "$@"; do
+    sans="$sans --san $san"
+  done
+
+  step certificate create "$common_name" "$out/$name/tls.crt" "$out/$name/tls.key" \
+    --profile leaf --ca "$out/$authority/ca.crt" --ca-key "$out/$authority/ca.key" $sans \
+    --not-after 24h --no-password --insecure >/dev/null 2>&1
+  cp "$out/$authority/ca.crt" "$out/$name/ca.pem"
+}
+
+authority ca "Kinetix test mesh CA"
+authority foreign-ca "Another mesh CA"
+
+leaf seal ca kinetix-seal-service spiffe://kinetix.local/service/seal kinetix-seal-service kinetix-seal-grpc
+leaf matching ca kinetix-matching-service \
+  spiffe://kinetix.local/service/matching kinetix-matching-service kinetix-matching-grpc localhost
+leaf review ca kinetix-review-service \
+  spiffe://kinetix.local/service/review kinetix-review-service kinetix-review-grpc localhost
+leaf impostor ca kinetix-matching-service spiffe://kinetix.local/service/review kinetix-matching-service localhost
+leaf foreign-matching foreign-ca kinetix-matching-service \
+  spiffe://kinetix.local/service/matching kinetix-matching-service localhost

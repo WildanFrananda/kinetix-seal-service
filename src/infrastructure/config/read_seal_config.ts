@@ -23,6 +23,18 @@ function readSealConfig(env: NodeJS.ProcessEnv): SealConfig {
       nodeWsUrl: read.url("KINETIX_SEAL_NODE_WS_URL", ["wss:"]),
       proofServerUrl: read.url("KINETIX_SEAL_PROOF_SERVER_URL", ["http:", "https:"])
     },
+    mesh: {
+      pkiDirectory: read.text("KINETIX_PKI_DIR"),
+      trustDomains: read.list("KINETIX_TRUST_DOMAIN")
+    },
+    facts: {
+      matchingAddress: read.address("KINETIX_SEAL_MATCHING_GRPC_ADDR"),
+      reviewAddress: read.address("KINETIX_SEAL_REVIEW_GRPC_ADDR"),
+      tickSeconds: read.positiveInteger("KINETIX_SEAL_FACTS_TICK_SECONDS"),
+      callTimeoutSeconds: read.positiveInteger("KINETIX_SEAL_FEED_TIMEOUT_SECONDS"),
+      pageSize: read.positiveIntegerAtMost("KINETIX_SEAL_FEED_PAGE_SIZE", 500),
+      pagesPerTick: read.positiveInteger("KINETIX_SEAL_FEED_PAGES_PER_TICK")
+    },
     walletStateDir: read.text("KINETIX_SEAL_WALLET_STATE_DIR"),
     sponsorMonitorSeconds: read.positiveInteger("KINETIX_SEAL_SPONSOR_MONITOR_SECONDS"),
     walletCheckpointSeconds: read.positiveInteger("KINETIX_SEAL_WALLET_CHECKPOINT_SECONDS"),

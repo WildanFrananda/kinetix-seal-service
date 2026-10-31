@@ -1,6 +1,7 @@
 node_modules/
 dist/
 managed/
+tests/fixtures/pki/
 coverage/
 src/infrastructure/postgres/generated/
 .env

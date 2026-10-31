@@ -3,12 +3,15 @@ import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-p
 import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider"
 import { Registry } from "prom-client"
-
+import CourierFacts from "./application/courier_facts.service.ts"
 import type { LoggerPort } from "./application/ports/logger.port.ts"
 import Readiness from "./application/readiness.service.ts"
 import RegistryGenerations from "./application/registry_generations.service.ts"
 import SponsorMonitor from "./application/sponsor_monitor.service.ts"
 import { readSealConfig } from "./infrastructure/config/read_seal_config.ts"
+import GrpcDeliveryFeed from "./infrastructure/grpc/grpc_delivery_feed.adapter.ts"
+import GrpcReviewFeed from "./infrastructure/grpc/grpc_review_feed.adapter.ts"
+import { loadMeshIdentity } from "./infrastructure/grpc/mesh_identity.ts"
 import { buildHttpServer } from "./infrastructure/http/http_server.ts"
 import { withProjectId } from "./infrastructure/midnight/blockfrost_url.ts"
 import { contractBuildDigest } from "./infrastructure/midnight/contract_build_digest.ts"
@@ -23,10 +26,12 @@ import { deriveWalletKeys } from "./infrastructure/midnight/wallet_keys.ts"
 import { loadWalletState, walletStateFile } from "./infrastructure/midnight/wallet_state_file.ts"
 import { estateMetrics } from "./infrastructure/observability/estate_metrics.ts"
 import JsonLogger from "./infrastructure/observability/json_logger.ts"
+import PrometheusFeedMetrics from "./infrastructure/observability/prometheus_feed_metrics.adapter.ts"
 import PrometheusRegistryGauges from "./infrastructure/observability/prometheus_registry_gauges.adapter.ts"
 import PrometheusSponsorGauges from "./infrastructure/observability/prometheus_sponsor_gauges.adapter.ts"
 import { redactOutput } from "./infrastructure/observability/redacting_output.ts"
 import { createPrismaClient } from "./infrastructure/postgres/prisma_client.ts"
+import PrismaCourierFactStore from "./infrastructure/postgres/prisma_courier_fact_store.adapter.ts"
 import PrismaDatabaseProbe from "./infrastructure/postgres/prisma_database_probe.adapter.ts"
 import PrismaRegistryGenerationStore from "./infrastructure/postgres/prisma_registry_generation_store.adapter.ts"
 import PrismaSponsorEventStore from "./infrastructure/postgres/prisma_sponsor_event_store.adapter.ts"
@@ -48,6 +53,17 @@ const metrics = estateMetrics(registry, service, config.serviceVersion)
 const gauges = new PrometheusSponsorGauges(registry)
 const registryGauges = new PrometheusRegistryGauges(registry)
 const prisma = createPrismaClient(config.databaseUrl)
+const meshIdentity = loadMeshIdentity(config.mesh)
+const deliveryFeed = new GrpcDeliveryFeed(config.facts.matchingAddress, meshIdentity, config.facts.callTimeoutSeconds)
+const reviewFeed = new GrpcReviewFeed(config.facts.reviewAddress, meshIdentity, config.facts.callTimeoutSeconds)
+const courierFacts = new CourierFacts(
+  deliveryFeed,
+  reviewFeed,
+  new PrismaCourierFactStore(prisma),
+  new PrometheusFeedMetrics(registry),
+  logger,
+  { pageSize: config.facts.pageSize, pagesPerTick: config.facts.pagesPerTick }
+)
 const wallet = new StartingSponsorWallet()
 const monitor = new SponsorMonitor(
   wallet,
@@ -70,6 +86,8 @@ onTermination(
     }
 
     await server.close()
+    deliveryFeed.close()
+    reviewFeed.close()
     await wallet.checkpoint()
     await wallet.stop()
     await prisma.$disconnect()
@@ -83,6 +101,14 @@ await server.listen({ host: "0.0.0.0", port: config.httpPort })
 logger.info({ message: "serving HTTP", fields: { port: config.httpPort, version: config.serviceVersion } })
 
 await monitor.resume()
+
+stops.push(
+  repeat(config.facts.tickSeconds, async () => {
+    await courierFacts.drain().catch((error: unknown) => {
+      logger.error({ message: "the courier facts could not be read" }, error)
+    })
+  })
+)
 
 stops.push(
   repeat(config.sponsorMonitorSeconds, async () => {

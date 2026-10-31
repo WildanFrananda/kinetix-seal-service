@@ -16,6 +16,14 @@ const complete: NodeJS.ProcessEnv = {
   KINETIX_SEAL_INDEXER_WS_URL: "wss://midnight-preprod.blockfrost.io/api/v0/ws",
   KINETIX_SEAL_NODE_WS_URL: "wss://rpc.midnight-preprod.blockfrost.io",
   KINETIX_SEAL_PROOF_SERVER_URL: "http://kinetix-seal-proof-server:6300",
+  KINETIX_PKI_DIR: "/pki",
+  KINETIX_TRUST_DOMAIN: "kinetix.local, prod.kinetix",
+  KINETIX_SEAL_MATCHING_GRPC_ADDR: "kinetix-matching-service:50053",
+  KINETIX_SEAL_REVIEW_GRPC_ADDR: "kinetix-review-grpc:50060",
+  KINETIX_SEAL_FACTS_TICK_SECONDS: "60",
+  KINETIX_SEAL_FEED_TIMEOUT_SECONDS: "30",
+  KINETIX_SEAL_FEED_PAGE_SIZE: "500",
+  KINETIX_SEAL_FEED_PAGES_PER_TICK: "20",
   KINETIX_SEAL_WALLET_STATE_DIR: "/var/lib/seal/wallet",
   KINETIX_SEAL_SPONSOR_MONITOR_SECONDS: "30",
   KINETIX_SEAL_WALLET_CHECKPOINT_SECONDS: "600",
@@ -35,6 +43,8 @@ describe("reading the configuration", () => {
     assert.equal(config.sponsorThresholds.minimumDust, 100n * 1_000_000_000_000_000n)
     assert.equal(config.midnight.nodeWsUrl, "wss://rpc.midnight-preprod.blockfrost.io")
     assert.equal(config.issuerSecret.length, 32)
+    assert.deepEqual(config.mesh.trustDomains, ["kinetix.local", "prod.kinetix"])
+    assert.equal(config.facts.reviewAddress, "kinetix-review-grpc:50060")
     assert.equal(config.issuerSecret[0], 0xa1)
   })
 
@@ -71,6 +81,18 @@ describe("reading the configuration", () => {
     assert.throws(
       () => readSealConfig({ ...complete, KINETIX_SEAL_NODE_WS_URL: "http://rpc.midnight-preprod.blockfrost.io" }),
       /KINETIX_SEAL_NODE_WS_URL must be a wss: URL/
+    )
+    assert.throws(
+      () => readSealConfig({ ...complete, KINETIX_SEAL_FEED_PAGE_SIZE: "501" }),
+      /KINETIX_SEAL_FEED_PAGE_SIZE must be at most 500/
+    )
+    assert.throws(
+      () => readSealConfig({ ...complete, KINETIX_SEAL_MATCHING_GRPC_ADDR: "https://kinetix-matching-service" }),
+      /KINETIX_SEAL_MATCHING_GRPC_ADDR must be host:port/
+    )
+    assert.throws(
+      () => readSealConfig({ ...complete, KINETIX_TRUST_DOMAIN: " , " }),
+      /KINETIX_TRUST_DOMAIN must name at least one value/
     )
   })
 
