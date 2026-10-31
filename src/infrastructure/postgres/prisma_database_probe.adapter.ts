@@ -2,15 +2,15 @@ import type { DatabaseProbePort } from "../../application/ports/database_probe.p
 import type { PrismaClient } from "./generated/client.ts"
 
 class PrismaDatabaseProbe implements DatabaseProbePort {
-  readonly #prisma: PrismaClient
+  private readonly prisma: PrismaClient
 
   constructor(prisma: PrismaClient) {
-    this.#prisma = prisma
+    this.prisma = prisma
   }
 
   async reachable(): Promise<boolean> {
     try {
-      await this.#prisma.$queryRaw`SELECT 1`
+      await this.prisma.$queryRaw`SELECT 1`
 
       return true
     } catch {

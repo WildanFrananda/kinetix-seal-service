@@ -13,13 +13,13 @@ import type { ReviewFeedPort } from "./ports/review_feed.port.ts"
 const streams: readonly FeedStream[] = ["deliveries", "reviews"]
 
 class CourierFacts {
-  readonly #deliveries: DeliveryFeedPort
-  readonly #reviews: ReviewFeedPort
-  readonly #store: CourierFactStorePort
-  readonly #metrics: FeedMetricsPort
-  readonly #logger: LoggerPort
-  readonly #limits: FeedLimits
-  #running = false
+  private readonly deliveries: DeliveryFeedPort
+  private readonly reviews: ReviewFeedPort
+  private readonly store: CourierFactStorePort
+  private readonly metrics: FeedMetricsPort
+  private readonly logger: LoggerPort
+  private readonly limits: FeedLimits
+  private running = false
 
   constructor(
     deliveries: DeliveryFeedPort,
@@ -29,34 +29,34 @@ class CourierFacts {
     logger: LoggerPort,
     limits: FeedLimits
   ) {
-    this.#deliveries = deliveries
-    this.#reviews = reviews
-    this.#store = store
-    this.#metrics = metrics
-    this.#logger = logger
-    this.#limits = limits
+    this.deliveries = deliveries
+    this.reviews = reviews
+    this.store = store
+    this.metrics = metrics
+    this.logger = logger
+    this.limits = limits
   }
 
   async drain(): Promise<void> {
-    if (this.#running) {
+    if (this.running) {
       return
     }
 
-    this.#running = true
+    this.running = true
 
     try {
       for (const stream of streams) {
-        await this.#drain(stream)
+        await this.drainStream(stream)
       }
     } finally {
-      this.#running = false
+      this.running = false
     }
   }
 
-  async #drain(stream: FeedStream): Promise<void> {
-    for (let pages = 0; pages < this.#limits.pagesPerTick; pages += 1) {
-      const more = await this.#pull(stream).catch((error: unknown) => {
-        this.#failed(stream, error)
+  private async drainStream(stream: FeedStream): Promise<void> {
+    for (let pages = 0; pages < this.limits.pagesPerTick; pages += 1) {
+      const more = await this.pull(stream).catch((error: unknown) => {
+        this.failed(stream, error)
 
         return false
       })
@@ -67,46 +67,46 @@ class CourierFacts {
     }
   }
 
-  async #pull(stream: FeedStream): Promise<boolean> {
-    const after = await this.#store.cursor(stream)
+  private async pull(stream: FeedStream): Promise<boolean> {
+    const after = await this.store.cursor(stream)
 
     if (stream === "deliveries") {
-      const page = await this.#deliveries.deliveriesSince(after, this.#limits.pageSize)
+      const page = await this.deliveries.deliveriesSince(after, this.limits.pageSize)
 
-      this.#assertValid(after, page)
-      await this.#store.recordDeliveries(after, page.next, page.records)
-      this.#metrics.recorded(stream, page.records.length)
+      this.assertValid(after, page)
+      await this.store.recordDeliveries(after, page.next, page.records)
+      this.metrics.recorded(stream, page.records.length)
 
       return page.hasMore
     }
 
-    const page = await this.#reviews.reviewsSince(after, this.#limits.pageSize)
+    const page = await this.reviews.reviewsSince(after, this.limits.pageSize)
 
-    this.#assertValid(after, page)
+    this.assertValid(after, page)
 
     const driverReviews = page.records.filter((review) => review.kind === "driver")
 
-    await this.#store.recordDriverReviews(after, page.next, driverReviews)
-    this.#metrics.recorded(stream, driverReviews.length)
+    await this.store.recordDriverReviews(after, page.next, driverReviews)
+    this.metrics.recorded(stream, driverReviews.length)
 
     return page.hasMore
   }
 
-  #assertValid<T extends { position: LogCursor }>(after: LogCursor, page: FeedPage<T>): void {
-    const violation = feedPageViolation(after, this.#limits.pageSize, page)
+  private assertValid<T extends { position: LogCursor }>(after: LogCursor, page: FeedPage<T>): void {
+    const violation = feedPageViolation(after, this.limits.pageSize, page)
 
     if (violation !== undefined) {
       throw new FeedCallFailure("invalid_page", violation)
     }
   }
 
-  #failed(stream: FeedStream, error: unknown): void {
+  private failed(stream: FeedStream, error: unknown): void {
     const kind = error instanceof FeedCallFailure ? error.kind : "store"
 
-    this.#metrics.failed(stream, kind)
+    this.metrics.failed(stream, kind)
 
     if (kind === "unavailable") {
-      this.#logger.warn({
+      this.logger.warn({
         message: "a fact feed is unavailable; it is read again on the next tick",
         fields: { stream, cause: error instanceof Error ? error.message : String(error) }
       })
@@ -114,7 +114,7 @@ class CourierFacts {
       return
     }
 
-    this.#logger.error({ message: "a fact feed stopped short", fields: { stream, kind } }, error)
+    this.logger.error({ message: "a fact feed stopped short", fields: { stream, kind } }, error)
   }
 }
 

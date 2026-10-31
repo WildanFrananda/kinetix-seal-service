@@ -1,7 +1,7 @@
-import type { SponsorCondition } from "../../types/sponsor_condition.type.ts"
+import type { RemoteSponsorCondition } from "../../types/remote_sponsor_condition.type.ts"
 
 interface SponsorConditionSourcePort {
-  condition(): SponsorCondition
+  condition(): RemoteSponsorCondition
 }
 
 export type { SponsorConditionSourcePort }

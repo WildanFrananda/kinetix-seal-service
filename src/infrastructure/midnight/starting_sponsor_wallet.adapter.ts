@@ -2,26 +2,26 @@ import type { SponsorWalletPort } from "../../application/ports/sponsor_wallet.p
 import type { SponsorSnapshot } from "../../types/sponsor_snapshot.type.ts"
 
 class StartingSponsorWallet implements SponsorWalletPort {
-  #started: SponsorWalletPort | undefined
+  private delegate: SponsorWalletPort | undefined
 
   started(wallet: SponsorWalletPort): void {
-    this.#started = wallet
+    this.delegate = wallet
   }
 
   async snapshot(): Promise<SponsorSnapshot> {
-    if (this.#started === undefined) {
+    if (this.delegate === undefined) {
       return { synced: false, dustBalance: 0n, dustCoins: 0, nightUtxos: 0, observedAt: new Date() }
     }
 
-    return this.#started.snapshot()
+    return this.delegate.snapshot()
   }
 
   async checkpoint(): Promise<void> {
-    await this.#started?.checkpoint()
+    await this.delegate?.checkpoint()
   }
 
   async stop(): Promise<void> {
-    await this.#started?.stop()
+    await this.delegate?.stop()
   }
 }
 

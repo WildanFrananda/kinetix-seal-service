@@ -6,16 +6,16 @@ import type { RegistryDeployOutcome } from "../../types/registry_deploy_outcome.
 const outcomes: readonly RegistryDeployOutcome[] = ["succeeded", "failed"]
 
 class PrometheusRegistryGauges implements RegistryGaugesPort {
-  readonly #generation: Gauge
-  readonly #deploys: Counter<"outcome">
+  private readonly generation: Gauge
+  private readonly deploys: Counter<"outcome">
 
   constructor(registry: Registry) {
-    this.#generation = new Gauge({
+    this.generation = new Gauge({
       name: "kinetix_seal_registry_generation",
       help: "The credential registry generation in use, 0 before the first is deployed",
       registers: [registry]
     })
-    this.#deploys = new Counter({
+    this.deploys = new Counter({
       name: "kinetix_seal_registry_deploys_total",
       help: "Credential registry deployments, by outcome",
       labelNames: ["outcome"],
@@ -23,16 +23,16 @@ class PrometheusRegistryGauges implements RegistryGaugesPort {
     })
 
     for (const outcome of outcomes) {
-      this.#deploys.inc({ outcome }, 0)
+      this.deploys.inc({ outcome }, 0)
     }
   }
 
   activeGeneration(generation: number): void {
-    this.#generation.set(generation)
+    this.generation.set(generation)
   }
 
   deployed(outcome: RegistryDeployOutcome): void {
-    this.#deploys.inc({ outcome })
+    this.deploys.inc({ outcome })
   }
 }
 

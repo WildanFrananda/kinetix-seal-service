@@ -33,13 +33,13 @@ const zkConfig = new NodeZkConfigProvider<string>(credentialRegistryDirectory)
 const compiledContract = compileCredentialRegistry()
 
 class InMemoryCredentialRegistry {
-  readonly #address: string
-  readonly #state: ContractState
-  readonly #zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
+  private readonly address: string
+  private readonly state: ContractState
+  private readonly zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
 
   private constructor(address: string, state: ContractState) {
-    this.#address = address
-    this.#state = state
+    this.address = address
+    this.state = state
   }
 
   static async deploy(issuerSecret: Uint8Array): Promise<InMemoryCredentialRegistry> {
@@ -60,46 +60,46 @@ class InMemoryCredentialRegistry {
   }
 
   ledger(): Ledger {
-    return ledger(this.#state.data)
+    return ledger(this.state.data)
   }
 
   async issue(leaf: Uint8Array, as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("issue", [leaf], as)
+    await this.call("issue", [leaf], as)
   }
 
   async revoke(index: bigint, as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("revoke", [index], as)
+    await this.call("revoke", [index], as)
   }
 
   async approvePredicate(predicate: Predicate, as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("approvePredicate", [predicate], as)
+    await this.call("approvePredicate", [predicate], as)
   }
 
   async withdrawPredicate(id: Uint8Array, as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("withdrawPredicate", [id], as)
+    await this.call("withdrawPredicate", [id], as)
   }
 
   async proposeIssuer(nextIssuerPk: Uint8Array, as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("proposeIssuer", [nextIssuerPk], as)
+    await this.call("proposeIssuer", [nextIssuerPk], as)
   }
 
   async acceptIssuer(as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("acceptIssuer", [], as)
+    await this.call("acceptIssuer", [], as)
   }
 
   async pause(as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("pause", [], as)
+    await this.call("pause", [], as)
   }
 
   async unpause(as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("unpause", [], as)
+    await this.call("unpause", [], as)
   }
 
   async present(challenge: Uint8Array, id: Uint8Array, as: CredentialRegistryPrivateState): Promise<void> {
-    await this.#call("present", [challenge, id], as)
+    await this.call("present", [challenge, id], as)
   }
 
-  async #call<K extends RegistryCircuit>(
+  private async call<K extends RegistryCircuit>(
     circuitId: K,
     args: CompactContract.CircuitParameters<Registry, K>,
     initialPrivateState: CredentialRegistryPrivateState
@@ -107,17 +107,17 @@ class InMemoryCredentialRegistry {
     const options = {
       compiledContract,
       circuitId,
-      contractAddress: this.#address,
+      contractAddress: this.address,
       args,
-      coinPublicKey: this.#zswap.coinPublicKey,
-      initialContractState: this.#state,
+      coinPublicKey: this.zswap.coinPublicKey,
+      initialContractState: this.state,
       initialZswapChainState: new ZswapChainState(),
       ledgerParameters: LedgerParameters.initialParameters(),
       initialPrivateState
     } as CallOptionsWithPrivateState<Registry, K>
-    const called = await createUnprovenCallTxFromInitialStates(zkConfig, options, this.#zswap.encryptionPublicKey)
+    const called = await createUnprovenCallTxFromInitialStates(zkConfig, options, this.zswap.encryptionPublicKey)
 
-    this.#state.data = new ChargedState(called.public.nextContractState)
+    this.state.data = new ChargedState(called.public.nextContractState)
   }
 }
 

@@ -20,21 +20,21 @@ import { unaryCall } from "./unary_call.ts"
 const peer = "matching"
 
 class GrpcDeliveryFeed implements DeliveryFeedPort {
-  readonly #client: Client
-  readonly #timeoutSeconds: number
+  private readonly client: Client
+  private readonly timeoutSeconds: number
 
   constructor(address: string, identity: MeshIdentity, timeoutSeconds: number) {
-    this.#client = new Client(address, meshChannelCredentials(identity, peer))
-    this.#timeoutSeconds = timeoutSeconds
+    this.client = new Client(address, meshChannelCredentials(identity, peer))
+    this.timeoutSeconds = timeoutSeconds
   }
 
   async deliveriesSince(after: LogCursor, limit: number): Promise<FeedPage<CourierDelivery>> {
     try {
       const response = await unaryCall(
-        this.#client,
+        this.client,
         DeliveryEvidenceService.method.deliveriesSince,
         create(DeliveriesSinceRequestSchema, { after: toWireCursor(after), limit }),
-        this.#timeoutSeconds
+        this.timeoutSeconds
       )
 
       return {
@@ -59,7 +59,7 @@ class GrpcDeliveryFeed implements DeliveryFeedPort {
   }
 
   close(): void {
-    this.#client.close()
+    this.client.close()
   }
 }
 
