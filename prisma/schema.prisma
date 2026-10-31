@@ -38,3 +38,30 @@ model RegistryGeneration {
   @@index([status])
   @@map("registry_generations")
 }
+
+model FeedCursor {
+  stream             String @id @db.VarChar(16)
+  throughTransaction BigInt @map("through_transaction")
+  throughSequence    BigInt @map("through_sequence")
+
+  @@map("feed_cursors")
+}
+
+model CourierDelivery {
+  orderNumber       String   @id @map("order_number") @db.VarChar(128)
+  driverPrincipalId String   @map("driver_principal_id") @db.VarChar(128)
+  deliveredAt       DateTime @map("delivered_at") @db.Timestamptz(6)
+
+  @@index([driverPrincipalId])
+  @@map("courier_deliveries")
+}
+
+model DriverReview {
+  reviewId          String   @id @map("review_id") @db.VarChar(128)
+  driverPrincipalId String   @map("driver_principal_id") @db.VarChar(128)
+  rating            Int      @db.SmallInt
+  createdAt         DateTime @map("created_at") @db.Timestamptz(6)
+
+  @@index([driverPrincipalId])
+  @@map("driver_reviews")
+}

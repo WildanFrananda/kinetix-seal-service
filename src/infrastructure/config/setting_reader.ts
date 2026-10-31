@@ -60,6 +60,40 @@ class SettingReader {
     return value
   }
 
+  positiveIntegerAtMost(name: string, maximum: number): number {
+    const value = this.positiveInteger(name)
+
+    if (value > maximum) {
+      this.#invalid.push(`${name} must be at most ${maximum}`)
+    }
+
+    return value
+  }
+
+  address(name: string): string {
+    const value = this.text(name)
+
+    if (value !== "" && !/^[a-z0-9.-]+:[0-9]{1,5}$/.test(value)) {
+      this.#invalid.push(`${name} must be host:port`)
+    }
+
+    return value
+  }
+
+  list(name: string): string[] {
+    const value = this.text(name)
+    const items = value
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item !== "")
+
+    if (value !== "" && items.length === 0) {
+      this.#invalid.push(`${name} must name at least one value`)
+    }
+
+    return items
+  }
+
   hexBytes(name: string, length: number): Uint8Array {
     const value = this.text(name)
 

@@ -5,4 +5,6 @@ set -eu
 
 cd "$(dirname "$0")/.."
 
+sh bin/test-pki
+
 node --test --test-reporter=spec --experimental-test-coverage "dist/tests/**/*.test.js"

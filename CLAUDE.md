@@ -174,6 +174,24 @@ contracts/
   is redacted from every output. The maintenance authority's signing key is derived from it and the generation
   number, so nothing stores it: every change is a new generation anyway.
 
+### The mesh and the courier facts (S1b)
+
+- **Seal's mesh identity** is `spiffe://kinetix.local/service/seal`, its leaf mounted at `KINETIX_PKI_DIR`
+  (`tls.crt`, `tls.key`, `ca.pem`), and the trust domains in `KINETIX_TRUST_DOMAIN`. Both are required, with no
+  default; a missing file stops the start.
+- **Every client checks its server twice** (`src/infrastructure/grpc/mesh_channel_credentials.ts`): the hostname
+  against the leaf's DNS names, then the leaf's single SPIFFE ID against the service seal meant to dial. Owners
+  admit seal per RPC by the name `seal`.
+- **gRPC is `@grpc/grpc-js` with the contracts' protobuf-es messages**, not proto-loader: `unaryCall` takes the
+  method's descriptor from `kinetix-contracts`, so the path, the request and the response types all come from
+  the contract. The generated modules are imported from the package as they ship.
+- **The feeds** (`CourierFacts`) follow notary's rules: a cursor per stream, moved by compare-and-swap with the
+  page's rows in one transaction; every page checked first (`src/domain/feed_page_violation.ts`); unavailable is
+  retried next tick, a refusal or a malformed page stops the stream and is logged as an error.
+- **Tests mint their own PKI.** `bin/test-pki` runs `step` (pinned in the toolchain image by SHA-256) to make a
+  CA, seal's leaf, matching's and review's, an impostor (matching's name, review's SPIFFE ID) and a leaf from
+  another CA, into `tests/fixtures/pki/`, which git ignores. `bin/test` runs it first. No key is ever committed.
+
 ### Testing
 
 - **The circuits run in memory** (`tests/infrastructure/midnight/in_memory_credential_registry.ts`): the

@@ -16,6 +16,8 @@
     "test": "node --test --test-reporter=spec \"dist/tests/**/*.test.js\""
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
+    "@grpc/grpc-js": "1.14.6",
     "@midnight-ntwrk/compact-runtime": "0.16.0",
     "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
@@ -30,6 +32,7 @@
     "@prisma/client": "7.10.1",
     "@scure/bip39": "2.4.0",
     "fastify": "5.12.7",
+    "kinetix-contracts": "1.7.1",
     "pg": "8.23.1",
     "prisma": "7.10.1",
     "prom-client": "15.1.3",
