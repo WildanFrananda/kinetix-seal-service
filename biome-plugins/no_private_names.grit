@@ -1,0 +1,8 @@
+language js
+
+or {
+  JsPrivateClassMemberName() as $member,
+  JsPrivateName() as $member
+} where {
+  register_diagnostic(span = $member, message = "Mark a private member with the private keyword, not with #")
+}

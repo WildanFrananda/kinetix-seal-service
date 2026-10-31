@@ -61,11 +61,17 @@ test. It refuses to start without the toolchain's database: a skipped database t
     is why ports differ from identity's here.
 
   `biome-plugins/exports_at_the_bottom.grit` refuses an inline `export` declaration.
+- **A private member says `private`** (the user, 2026-10-31, *"saya mau nya explicit"*): `private readonly
+  wallet`, `private async drainStream()`, never a `#` name. Public members carry no modifier.
+  `biome-plugins/no_private_names.grit` refuses `#` in a declaration and in an access. A private member never
+  shares its name with a public one; the four that did were renamed (`drainStream`, `reconcileOnce`, `payNow`,
+  `delegate`).
 - **English only.**
 
 ## Conventions
 
-- **Config fails fast.** Every setting is `KINETIX_SEAL_*`, required, with no default (`read_seal_config.ts`).
+- **Config fails fast.** Every setting is required, with no default, and each process reads only its own
+  (`read_service_config.ts`, `read_sponsor_config.ts`).
   A missing or invalid value stops the start with every problem named at once, and never prints a value.
 - **`KINETIX_SEAL_SERVICE_VERSION` is baked into the image** from the build argument. CI checks it, and
   `kinetix_build_info` reports it.
@@ -84,17 +90,38 @@ test. It refuses to start without the toolchain's database: a skipped database t
 
 ## The sponsor wallet
 
+- **Two processes, one image** (SEAL-D17, 2026-10-31). `node dist/src/main.js` is the service: the API, the fact
+  feeds, the registry generations. `node dist/src/sponsor_main.js` is the sponsor, the only process that runs the
+  wallet. Each reads its own settings (`read_service_config.ts`, `read_sponsor_config.ts`): the service holds the
+  issuer secret and never the seed, the sponsor holds the seed and never the issuer secret.
+- **The sponsor stays up across seal's releases.** Production pins it at its own digest
+  (`KINETIX_SEAL_SPONSOR_DIGEST`), and it is deployed on purpose, only when the wallet's code changes, as the
+  deployable `kinetix-seal-sponsor`. A release of the service takes two or three minutes and leaves the wallet
+  alone.
+- **The link** (`src/infrastructure/sponsor/`): HTTPS with mutual TLS on 8014, seal's own leaf at both ends. The
+  sponsor admits only `spiffe://…/service/seal`; the client accepts only a server whose SPIFFE ID is seal's. The
+  leaf names `kinetix-seal-service`, not the sponsor's host, so the link checks the chain and the SPIFFE ID, not
+  the hostname. The API is `/v1`, kept backward compatible because the two run different builds:
+  - `GET /v1/state`: the condition and the snapshot, the DUST balance in SPECK as a string;
+  - `POST /v1/transactions/pay`: `{ "transaction": hex }`, a proven and unbound transaction (the ledger's
+    `"signature"`, `"proof"`, `"pre-binding"`); the sponsor adds DUST, signs, finalizes, submits, and answers
+    `{ "txId" }`. Spends run one at a time. Confirmation is the caller's, through the indexer. While the wallet
+    syncs the answer is 503.
+  - Health, readiness and metrics are on 8013, plain HTTP, like every probe in the estate.
+- **Readiness.** The service is ready when Postgres answers and the sponsor, polled every
+  `KINETIX_SEAL_SPONSOR_POLL_SECONDS`, reports anything but `syncing`; unreachable is not ready. The sponsor is
+  ready when its wallet is synced, and keeps the image's 15-minute start period.
 - **The sponsor's address**, for the faucet: `node dist/src/cli/sponsor_address.js`, which needs only
-  `KINETIX_SEAL_NETWORK_ID` and `KINETIX_SEAL_SPONSOR_MNEMONIC` and starts no wallet, so it is safe while the
-  service runs.
-- **One process per seed, ever.** Two wallet instances on one seed double-spend DUST. The admin commands
-  start their own instance, so they run only while the service is stopped:
-  `docker compose run --rm kinetix-seal-service node dist/src/cli/register_dust.js`, or `split_night.js` with
-  `KINETIX_SEAL_SPLIT_OUTPUTS`.
-- **A restore takes about ten minutes.** The spike measured 506 s and 10 min on the VPS. The HTTP server
-  starts first, so `/health` answers and `/health/ready` reads `syncing` until then. The image's healthcheck
-  has a 15-minute start period, and compose must give at least as much; otherwise every deploy fails its wait
-  and rolls back. A fresh wallet syncs from genesis in about 2 hours.
+  `KINETIX_SEAL_NETWORK_ID` and `KINETIX_SEAL_SPONSOR_MNEMONIC` and starts no wallet.
+- **One process per seed, ever.** Two wallet instances on one seed double-spend DUST. The admin commands start
+  their own instance, so they run with the sponsor stopped (the service keeps serving):
+  `docker compose run --rm --no-deps kinetix-seal-sponsor node dist/src/cli/register_dust.js`, or
+  `split_night.js` with `KINETIX_SEAL_SPLIT_OUTPUTS`.
+- **A restore takes about ten minutes** (506 s to 562 s on the VPS). The sponsor's HTTP server starts first, so
+  `/health` answers and `/health/ready` reads `syncing` until then. A restore is CPU-bound and starves the event
+  loop: on 2026-10-31, inside one process, a feed call missed its 30 s deadline at the moment the restore ended.
+  That is one more reason the wallet has its own process. A fresh wallet syncs from genesis in about 2 hours
+  (3 h 25 min on the VPS, 2026-10-22).
 - **The state volume** (`KINETIX_SEAL_WALLET_STATE_DIR`) holds the serialized wallet. It is checkpointed every
   `KINETIX_SEAL_WALLET_CHECKPOINT_SECONDS` and on SIGTERM, atomically, mode 600. Losing it costs a full sync,
   not funds: the seed is in SOPS. Estate backups do not cover it.

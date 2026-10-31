@@ -22,14 +22,14 @@ async function advance(
 }
 
 class PrismaCourierFactStore implements CourierFactStorePort {
-  readonly #prisma: PrismaClient
+  private readonly prisma: PrismaClient
 
   constructor(prisma: PrismaClient) {
-    this.#prisma = prisma
+    this.prisma = prisma
   }
 
   async cursor(stream: FeedStream): Promise<LogCursor> {
-    const row = await this.#prisma.feedCursor.findUnique({ where: { stream } })
+    const row = await this.prisma.feedCursor.findUnique({ where: { stream } })
 
     if (row === null) {
       throw new Error(`feed_cursors holds no row for ${stream}: its migration seeds one`)
@@ -39,7 +39,7 @@ class PrismaCourierFactStore implements CourierFactStorePort {
   }
 
   async recordDeliveries(from: LogCursor, next: LogCursor, deliveries: CourierDelivery[]): Promise<void> {
-    await this.#prisma.$transaction(async (transaction) => {
+    await this.prisma.$transaction(async (transaction) => {
       await advance(transaction, "deliveries", from, next)
 
       if (deliveries.length > 0) {
@@ -56,7 +56,7 @@ class PrismaCourierFactStore implements CourierFactStorePort {
   }
 
   async recordDriverReviews(from: LogCursor, next: LogCursor, reviews: ReviewRecord[]): Promise<void> {
-    await this.#prisma.$transaction(async (transaction) => {
+    await this.prisma.$transaction(async (transaction) => {
       await advance(transaction, "reviews", from, next)
 
       if (reviews.length > 0) {

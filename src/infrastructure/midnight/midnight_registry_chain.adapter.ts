@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto"
 import { createUnprovenDeployTxFromVerifierKeys } from "@midnight-ntwrk/midnight-js-contracts"
+import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/ledger"
 import { SucceedEntirely } from "@midnight-ntwrk/midnight-js-types"
 
 import { pureCircuits } from "#contracts/credential_registry/contract/index.js"
@@ -11,42 +13,42 @@ import type { RegistryGeneration } from "../../types/registry_generation.type.ts
 import { withTimeout } from "../scheduling/with_timeout.ts"
 import { compileCredentialRegistry } from "./credential_registry_contract.ts"
 import { maintenanceSigningKey } from "./maintenance_signing_key.ts"
-import { payAndSubmit } from "./wallet_transactions.ts"
 
 const compiledContract = compileCredentialRegistry()
 
 class MidnightRegistryChain implements RegistryChainPort {
-  readonly #dependencies: MidnightRegistryChainDependencies
+  private readonly dependencies: MidnightRegistryChainDependencies
 
   constructor(dependencies: MidnightRegistryChainDependencies) {
-    this.#dependencies = dependencies
+    this.dependencies = dependencies
   }
 
   async prepareDeploy(generation: number): Promise<PreparedDeploy> {
-    const { keys, zkConfig, issuerSecret } = this.#dependencies
+    const { zkConfig, issuerSecret } = this.dependencies
+    const zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
     const deploy = await createUnprovenDeployTxFromVerifierKeys(
       zkConfig,
-      keys.shieldedSecretKeys.coinPublicKey,
+      zswap.coinPublicKey,
       {
         compiledContract,
         args: [pureCircuits.issuerPublicKey(issuerSecret)],
         signingKey: maintenanceSigningKey(issuerSecret, generation),
         initialPrivateState: { role: "issuer", issuerSecret }
       },
-      keys.shieldedSecretKeys.encryptionPublicKey
+      zswap.encryptionPublicKey
     )
     const chain = this
 
     return {
       contractAddress: deploy.public.contractAddress,
       async submit(): Promise<DeployReceipt> {
-        return chain.#submit(deploy.private.unprovenTx, `the deploy of generation ${generation}`)
+        return chain.submit(deploy.private.unprovenTx, `the deploy of generation ${generation}`)
       }
     }
   }
 
   async observeAnchor(generation: RegistryGeneration): Promise<AnchorObservation> {
-    const { blocks, publicData, networkStepSeconds } = this.#dependencies
+    const { blocks, publicData, networkStepSeconds } = this.dependencies
 
     if (generation.anchorHeight === undefined || generation.anchorHash === undefined) {
       return "unknown"
@@ -66,13 +68,13 @@ class MidnightRegistryChain implements RegistryChainPort {
     return tip < generation.anchorHeight && state === null ? "replaced" : "unknown"
   }
 
-  async #submit(
+  private async submit(
     transaction: Parameters<MidnightRegistryChainDependencies["proofs"]["proveTx"]>[0],
     what: string
   ): Promise<DeployReceipt> {
-    const { wallet, keys, proofs, publicData, networkStepSeconds } = this.#dependencies
+    const { payer, proofs, publicData, networkStepSeconds } = this.dependencies
     const proven = await withTimeout(proofs.proveTx(transaction), networkStepSeconds, `proving ${what}`)
-    const txId = await withTimeout(payAndSubmit(wallet, keys, proven), networkStepSeconds, `submitting ${what}`)
+    const txId = await withTimeout(payer.pay(proven.serialize()), networkStepSeconds, `paying for ${what}`)
     const data = await withTimeout(publicData.watchForTxData(txId), networkStepSeconds, `confirming ${what}`)
 
     if (data.status !== SucceedEntirely) {

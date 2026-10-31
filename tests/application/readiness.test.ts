@@ -18,6 +18,12 @@ describe("readiness", () => {
     assert.equal(report.ready, false)
   })
 
+  it("is not ready while the sponsor cannot be reached", async () => {
+    const report = await new Readiness(new FakeDatabaseProbe(true), new FixedSponsorCondition("unreachable")).report()
+
+    assert.deepEqual(report, { ready: false, database: "reachable", sponsor: "unreachable" })
+  })
+
   it("stays ready when the sponsor has no DUST, which is an alert, not an outage", async () => {
     const report = await new Readiness(new FakeDatabaseProbe(true), new FixedSponsorCondition("no_dust")).report()
 

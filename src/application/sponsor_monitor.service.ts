@@ -10,13 +10,13 @@ import type { SponsorGaugesPort } from "./ports/sponsor_gauges.port.ts"
 import type { SponsorWalletPort } from "./ports/sponsor_wallet.port.ts"
 
 class SponsorMonitor implements SponsorConditionSourcePort {
-  readonly #wallet: SponsorWalletPort
-  readonly #events: SponsorEventStorePort
-  readonly #gauges: SponsorGaugesPort
-  readonly #logger: LoggerPort
-  readonly #thresholds: SponsorThresholds
-  #current: SponsorCondition = "syncing"
-  #lastEvent: SponsorEvent | undefined
+  private readonly wallet: SponsorWalletPort
+  private readonly events: SponsorEventStorePort
+  private readonly gauges: SponsorGaugesPort
+  private readonly logger: LoggerPort
+  private readonly thresholds: SponsorThresholds
+  private current: SponsorCondition = "syncing"
+  private lastEvent: SponsorEvent | undefined
 
   constructor(
     wallet: SponsorWalletPort,
@@ -25,29 +25,29 @@ class SponsorMonitor implements SponsorConditionSourcePort {
     logger: LoggerPort,
     thresholds: SponsorThresholds
   ) {
-    this.#wallet = wallet
-    this.#events = events
-    this.#gauges = gauges
-    this.#logger = logger
-    this.#thresholds = thresholds
+    this.wallet = wallet
+    this.events = events
+    this.gauges = gauges
+    this.logger = logger
+    this.thresholds = thresholds
   }
 
   condition(): SponsorCondition {
-    return this.#current
+    return this.current
   }
 
   async resume(): Promise<void> {
-    this.#lastEvent = await this.#events.latest()
+    this.lastEvent = await this.events.latest()
   }
 
   async observe(): Promise<SponsorCondition> {
-    const snapshot = await this.#wallet.snapshot()
-    const condition = sponsorConditionOf(snapshot, this.#thresholds)
+    const snapshot = await this.wallet.snapshot()
+    const condition = sponsorConditionOf(snapshot, this.thresholds)
 
-    this.#current = condition
-    this.#gauges.observe(snapshot, condition)
+    this.current = condition
+    this.gauges.observe(snapshot, condition)
 
-    if (!isSponsorEventDue(this.#lastEvent, condition, snapshot.dustCoins, snapshot.nightUtxos)) {
+    if (!isSponsorEventDue(this.lastEvent, condition, snapshot.dustCoins, snapshot.nightUtxos)) {
       return condition
     }
 
@@ -59,10 +59,10 @@ class SponsorMonitor implements SponsorConditionSourcePort {
       nightUtxos: snapshot.nightUtxos
     }
 
-    await this.#events.record(event)
-    this.#lastEvent = event
+    await this.events.record(event)
+    this.lastEvent = event
 
-    this.#logger.info({
+    this.logger.info({
       message: "the sponsor wallet changed",
       fields: {
         condition,

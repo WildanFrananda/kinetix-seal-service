@@ -8,14 +8,14 @@ import type { PrismaClient } from "./generated/client.ts"
 const statuses: readonly RegistryGenerationStatus[] = ["deploying", "active", "retired"]
 
 class PrismaRegistryGenerationStore implements RegistryGenerationStorePort {
-  readonly #prisma: PrismaClient
+  private readonly prisma: PrismaClient
 
   constructor(prisma: PrismaClient) {
-    this.#prisma = prisma
+    this.prisma = prisma
   }
 
   async unretired(): Promise<RegistryGeneration[]> {
-    const rows = await this.#prisma.registryGeneration.findMany({
+    const rows = await this.prisma.registryGeneration.findMany({
       where: { status: { not: "retired" } },
       orderBy: { generation: "asc" }
     })
@@ -41,13 +41,13 @@ class PrismaRegistryGenerationStore implements RegistryGenerationStorePort {
   }
 
   async highestGeneration(): Promise<number> {
-    const highest = await this.#prisma.registryGeneration.aggregate({ _max: { generation: true } })
+    const highest = await this.prisma.registryGeneration.aggregate({ _max: { generation: true } })
 
     return highest._max.generation ?? 0
   }
 
   async recordDeploying(generation: RegistryGeneration): Promise<void> {
-    await this.#prisma.registryGeneration.create({
+    await this.prisma.registryGeneration.create({
       data: {
         generation: generation.generation,
         contractAddress: generation.contractAddress,
@@ -59,7 +59,7 @@ class PrismaRegistryGenerationStore implements RegistryGenerationStorePort {
   }
 
   async activate(generation: number, receipt: DeployReceipt): Promise<void> {
-    const updated = await this.#prisma.registryGeneration.updateMany({
+    const updated = await this.prisma.registryGeneration.updateMany({
       where: { generation, status: "deploying" },
       data: {
         status: "active",
@@ -76,7 +76,7 @@ class PrismaRegistryGenerationStore implements RegistryGenerationStorePort {
   }
 
   async retire(retirement: RegistryRetirement): Promise<void> {
-    await this.#prisma.registryGeneration.updateMany({
+    await this.prisma.registryGeneration.updateMany({
       where: { generation: retirement.generation, status: { not: "retired" } },
       data: { status: "retired", retiredReason: retirement.reason, retiredAt: new Date() }
     })

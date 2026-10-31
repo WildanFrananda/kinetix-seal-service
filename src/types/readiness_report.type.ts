@@ -1,10 +1,10 @@
 import type { DatabaseReachability } from "./database_reachability.type.ts"
-import type { SponsorCondition } from "./sponsor_condition.type.ts"
+import type { RemoteSponsorCondition } from "./remote_sponsor_condition.type.ts"
 
 type ReadinessReport = {
   ready: boolean
   database: DatabaseReachability
-  sponsor: SponsorCondition
+  sponsor: RemoteSponsorCondition
 }
 
 export type { ReadinessReport }

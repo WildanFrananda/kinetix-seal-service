@@ -30,21 +30,21 @@ function kindOf(kind: ReviewKind): ReviewRecordKind {
 }
 
 class GrpcReviewFeed implements ReviewFeedPort {
-  readonly #client: Client
-  readonly #timeoutSeconds: number
+  private readonly client: Client
+  private readonly timeoutSeconds: number
 
   constructor(address: string, identity: MeshIdentity, timeoutSeconds: number) {
-    this.#client = new Client(address, meshChannelCredentials(identity, peer))
-    this.#timeoutSeconds = timeoutSeconds
+    this.client = new Client(address, meshChannelCredentials(identity, peer))
+    this.timeoutSeconds = timeoutSeconds
   }
 
   async reviewsSince(after: LogCursor, limit: number): Promise<FeedPage<ReviewRecord>> {
     try {
       const response = await unaryCall(
-        this.#client,
+        this.client,
         ReviewEvidenceService.method.reviewsSince,
         create(ReviewsSinceRequestSchema, { after: toWireCursor(after), limit }),
-        this.#timeoutSeconds
+        this.timeoutSeconds
       )
 
       return {
@@ -71,7 +71,7 @@ class GrpcReviewFeed implements ReviewFeedPort {
   }
 
   close(): void {
-    this.#client.close()
+    this.client.close()
   }
 }
 

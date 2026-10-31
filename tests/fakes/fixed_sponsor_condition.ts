@@ -1,14 +1,14 @@
 import type { SponsorConditionSourcePort } from "../../src/application/ports/sponsor_condition_source.port.ts"
-import type { SponsorCondition } from "../../src/types/sponsor_condition.type.ts"
+import type { RemoteSponsorCondition } from "../../src/types/remote_sponsor_condition.type.ts"
 
 class FixedSponsorCondition implements SponsorConditionSourcePort {
-  current: SponsorCondition
+  current: RemoteSponsorCondition
 
-  constructor(current: SponsorCondition) {
+  constructor(current: RemoteSponsorCondition) {
     this.current = current
   }
 
-  condition(): SponsorCondition {
+  condition(): RemoteSponsorCondition {
     return this.current
   }
 }

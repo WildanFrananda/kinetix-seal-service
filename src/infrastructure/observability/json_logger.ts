@@ -6,34 +6,34 @@ const severity: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, erro
 const reserved = new Set(["timestamp", "level", "message", "logger", "request_id", "stack"])
 
 class JsonLogger implements LoggerPort {
-  readonly #name: string
-  readonly #threshold: number
-  readonly #write: (line: string) => void
+  private readonly name: string
+  private readonly threshold: number
+  private readonly write: (line: string) => void
 
   constructor(name: string, level: LogLevel, write: (line: string) => void) {
-    this.#name = name
-    this.#threshold = severity[level]
-    this.#write = write
+    this.name = name
+    this.threshold = severity[level]
+    this.write = write
   }
 
   debug(event: LogEvent): void {
-    this.#emit("debug", event, undefined)
+    this.emit("debug", event, undefined)
   }
 
   info(event: LogEvent): void {
-    this.#emit("info", event, undefined)
+    this.emit("info", event, undefined)
   }
 
   warn(event: LogEvent): void {
-    this.#emit("warn", event, undefined)
+    this.emit("warn", event, undefined)
   }
 
   error(event: LogEvent, error?: unknown): void {
-    this.#emit("error", event, error)
+    this.emit("error", event, error)
   }
 
-  #emit(level: LogLevel, event: LogEvent, error: unknown): void {
-    if (severity[level] < this.#threshold) {
+  private emit(level: LogLevel, event: LogEvent, error: unknown): void {
+    if (severity[level] < this.threshold) {
       return
     }
 
@@ -41,7 +41,7 @@ class JsonLogger implements LoggerPort {
       timestamp: new Date().toISOString(),
       level,
       message: event.message,
-      logger: this.#name
+      logger: this.name
     }
 
     if (event.requestId !== undefined) {
@@ -59,7 +59,7 @@ class JsonLogger implements LoggerPort {
       line.error = String(error)
     }
 
-    this.#write(
+    this.write(
       `${JSON.stringify(line, (_key, value: unknown) => (typeof value === "bigint" ? value.toString() : value))}\n`
     )
   }

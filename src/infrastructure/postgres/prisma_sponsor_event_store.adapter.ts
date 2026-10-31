@@ -6,14 +6,14 @@ import type { PrismaClient } from "./generated/client.ts"
 const conditions: readonly SponsorCondition[] = ["syncing", "healthy", "low_dust", "no_dust"]
 
 class PrismaSponsorEventStore implements SponsorEventStorePort {
-  readonly #prisma: PrismaClient
+  private readonly prisma: PrismaClient
 
   constructor(prisma: PrismaClient) {
-    this.#prisma = prisma
+    this.prisma = prisma
   }
 
   async record(event: SponsorEvent): Promise<void> {
-    await this.#prisma.sponsorEvent.create({
+    await this.prisma.sponsorEvent.create({
       data: {
         occurredAt: event.occurredAt,
         condition: event.condition,
@@ -25,7 +25,7 @@ class PrismaSponsorEventStore implements SponsorEventStorePort {
   }
 
   async latest(): Promise<SponsorEvent | undefined> {
-    const row = await this.#prisma.sponsorEvent.findFirst({ orderBy: { id: "desc" } })
+    const row = await this.prisma.sponsorEvent.findFirst({ orderBy: { id: "desc" } })
 
     if (row === null) {
       return undefined

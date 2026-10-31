@@ -1,17 +1,17 @@
 class SettingReader {
-  readonly #env: NodeJS.ProcessEnv
-  readonly #missing: string[] = []
-  readonly #invalid: string[] = []
+  private readonly env: NodeJS.ProcessEnv
+  private readonly missing: string[] = []
+  private readonly invalid: string[] = []
 
   constructor(env: NodeJS.ProcessEnv) {
-    this.#env = env
+    this.env = env
   }
 
   text(name: string): string {
-    const value = this.#env[name]?.trim()
+    const value = this.env[name]?.trim()
 
     if (value === undefined || value === "") {
-      this.#missing.push(name)
+      this.missing.push(name)
 
       return ""
     }
@@ -29,7 +29,7 @@ class SettingReader {
     const parsed = /^[0-9]+$/.test(value) ? Number(value) : Number.NaN
 
     if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-      this.#invalid.push(`${name} must be a positive integer`)
+      this.invalid.push(`${name} must be a positive integer`)
     }
 
     return parsed
@@ -40,7 +40,7 @@ class SettingReader {
     const match = allowed.find((candidate) => candidate === value)
 
     if (value !== "" && match === undefined) {
-      this.#invalid.push(`${name} must be one of ${allowed.join(", ")}`)
+      this.invalid.push(`${name} must be one of ${allowed.join(", ")}`)
     }
 
     return match ?? (value as T)
@@ -54,7 +54,7 @@ class SettingReader {
     }
 
     if (!URL.canParse(value) || !protocols.includes(new URL(value).protocol)) {
-      this.#invalid.push(`${name} must be a ${protocols.join(" or ")} URL`)
+      this.invalid.push(`${name} must be a ${protocols.join(" or ")} URL`)
     }
 
     return value
@@ -64,7 +64,7 @@ class SettingReader {
     const value = this.positiveInteger(name)
 
     if (value > maximum) {
-      this.#invalid.push(`${name} must be at most ${maximum}`)
+      this.invalid.push(`${name} must be at most ${maximum}`)
     }
 
     return value
@@ -74,7 +74,7 @@ class SettingReader {
     const value = this.text(name)
 
     if (value !== "" && !/^[a-z0-9.-]+:[0-9]{1,5}$/.test(value)) {
-      this.#invalid.push(`${name} must be host:port`)
+      this.invalid.push(`${name} must be host:port`)
     }
 
     return value
@@ -88,7 +88,7 @@ class SettingReader {
       .filter((item) => item !== "")
 
     if (value !== "" && items.length === 0) {
-      this.#invalid.push(`${name} must name at least one value`)
+      this.invalid.push(`${name} must name at least one value`)
     }
 
     return items
@@ -102,7 +102,7 @@ class SettingReader {
     }
 
     if (!new RegExp(`^[0-9a-f]{${length * 2}}$`).test(value)) {
-      this.#invalid.push(`${name} must be ${length} bytes of lowercase hex`)
+      this.invalid.push(`${name} must be ${length} bytes of lowercase hex`)
 
       return new Uint8Array(length)
     }
@@ -111,7 +111,7 @@ class SettingReader {
   }
 
   verify(): void {
-    const problems = [...this.#missing.map((name) => `${name} is required and has no default`), ...this.#invalid]
+    const problems = [...this.missing.map((name) => `${name} is required and has no default`), ...this.invalid]
 
     if (problems.length > 0) {
       throw new Error(`the configuration is incomplete: ${problems.join("; ")}`)

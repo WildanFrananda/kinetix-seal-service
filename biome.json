@@ -59,5 +59,9 @@
       }
     }
   ],
-  "plugins": ["./biome-plugins/no_arrow_definitions.grit", "./biome-plugins/exports_at_the_bottom.grit"]
+  "plugins": [
+    "./biome-plugins/no_arrow_definitions.grit",
+    "./biome-plugins/exports_at_the_bottom.grit",
+    "./biome-plugins/no_private_names.grit"
+  ]
 }

@@ -6,22 +6,22 @@ import type { SponsorSnapshot } from "../../types/sponsor_snapshot.type.ts"
 import { saveWalletState } from "./wallet_state_file.ts"
 
 class FacadeSponsorWallet implements SponsorWalletPort {
-  readonly #wallet: WalletFacade
-  readonly #stateFile: string
-  readonly #subscription: Subscription
-  #latest: FacadeState | undefined
+  private readonly wallet: WalletFacade
+  private readonly stateFile: string
+  private readonly subscription: Subscription
+  private latest: FacadeState | undefined
 
   constructor(wallet: WalletFacade, stateFile: string) {
-    this.#wallet = wallet
-    this.#stateFile = stateFile
-    this.#subscription = wallet.state().subscribe((state) => {
-      this.#latest = state
+    this.wallet = wallet
+    this.stateFile = stateFile
+    this.subscription = wallet.state().subscribe((state) => {
+      this.latest = state
     })
   }
 
   async snapshot(): Promise<SponsorSnapshot> {
     const observedAt = new Date()
-    const state = this.#latest
+    const state = this.latest
 
     if (state === undefined) {
       return { synced: false, dustBalance: 0n, dustCoins: 0, nightUtxos: 0, observedAt }
@@ -37,12 +37,12 @@ class FacadeSponsorWallet implements SponsorWalletPort {
   }
 
   async checkpoint(): Promise<void> {
-    await saveWalletState(this.#wallet, this.#stateFile)
+    await saveWalletState(this.wallet, this.stateFile)
   }
 
   async stop(): Promise<void> {
-    this.#subscription.unsubscribe()
-    await this.#wallet.stop()
+    this.subscription.unsubscribe()
+    await this.wallet.stop()
   }
 }
 

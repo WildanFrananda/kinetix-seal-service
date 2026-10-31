@@ -1,12 +1,10 @@
 import type { ProofProvider, PublicDataProvider, ZKConfigProvider } from "@midnight-ntwrk/midnight-js-types"
-import type { WalletFacade } from "@midnightntwrk/wallet-sdk"
 
+import type { TransactionPayerPort } from "../application/ports/transaction_payer.port.ts"
 import type IndexerBlocks from "../infrastructure/midnight/indexer_blocks.ts"
-import type { WalletKeys } from "./wallet_keys.type.ts"
 
 type MidnightRegistryChainDependencies = {
-  wallet: WalletFacade
-  keys: WalletKeys
+  payer: TransactionPayerPort
   publicData: PublicDataProvider
   proofs: ProofProvider
   zkConfig: ZKConfigProvider<string>

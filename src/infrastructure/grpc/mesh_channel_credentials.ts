@@ -2,7 +2,7 @@ import { checkServerIdentity, type PeerCertificate } from "node:tls"
 import { type ChannelCredentials, credentials } from "@grpc/grpc-js"
 
 import type { MeshIdentity } from "../../types/mesh_identity.type.ts"
-import { serviceOfCertificate } from "./spiffe.ts"
+import { serviceOfCertificate } from "../mesh/spiffe.ts"
 
 function meshChannelCredentials(identity: MeshIdentity, server: string): ChannelCredentials {
   return credentials.createSsl(identity.authority, identity.privateKey, identity.certificate, {

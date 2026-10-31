@@ -24,18 +24,18 @@ class FakeCourierFactStore implements CourierFactStorePort {
   }
 
   async recordDeliveries(_from: LogCursor, next: LogCursor, deliveries: CourierDelivery[]): Promise<void> {
-    this.#failIfAsked()
+    this.failIfAsked()
     this.cursors.set("deliveries", next)
     this.deliveries.push(...deliveries)
   }
 
   async recordDriverReviews(_from: LogCursor, next: LogCursor, reviews: ReviewRecord[]): Promise<void> {
-    this.#failIfAsked()
+    this.failIfAsked()
     this.cursors.set("reviews", next)
     this.reviews.push(...reviews)
   }
 
-  #failIfAsked(): void {
+  private failIfAsked(): void {
     const failure = this.failNext
 
     this.failNext = undefined
