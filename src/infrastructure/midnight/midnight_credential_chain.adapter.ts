@@ -1,21 +1,32 @@
 import { randomBytes } from "node:crypto"
-import { createUnprovenCallTxFromInitialStates, getPublicStates } from "@midnight-ntwrk/midnight-js-contracts"
+import {
+  type CallOptionsWithPrivateState,
+  createUnprovenCallTxFromInitialStates,
+  getPublicStates
+} from "@midnight-ntwrk/midnight-js-contracts"
+import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js"
 import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/ledger"
 
-import { ledger } from "#contracts/credential_registry/contract/index.js"
+import { type Ledger, ledger, pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import type { CredentialChainPort } from "../../application/ports/credential_chain.port.ts"
+import type { PredicateChainPort } from "../../application/ports/predicate_chain.port.ts"
 import type { CredentialRecord } from "../../types/credential_record.type.ts"
-import type { IssueReceipt } from "../../types/issue_receipt.type.ts"
 import type { MidnightCredentialChainDependencies } from "../../types/midnight_credential_chain_dependencies.type.ts"
+import type { PlacedPredicate } from "../../types/placed_predicate.type.ts"
+import type { RegistryCircuitId } from "../../types/registry_circuit_id.type.ts"
+import type { RegistryContract } from "../../types/registry_contract.type.ts"
+import type { RegistryPredicate } from "../../types/registry_predicate.type.ts"
+import type { RegistryReceipt } from "../../types/registry_receipt.type.ts"
 import { withTimeout } from "../scheduling/with_timeout.ts"
 import { credentialLeafOf } from "./credential_leaf.ts"
 import { compileCredentialRegistry } from "./credential_registry_contract.ts"
 import { issuedLeafIndex } from "./issued_leaf_index.ts"
+import { placedPredicatesOf } from "./placed_predicates.ts"
 import { submitSealTransaction } from "./submit_seal_transaction.ts"
 
 const compiledContract = compileCredentialRegistry()
 
-class MidnightCredentialChain implements CredentialChainPort {
+class MidnightCredentialChain implements CredentialChainPort, PredicateChainPort {
   private readonly dependencies: MidnightCredentialChainDependencies
 
   constructor(dependencies: MidnightCredentialChainDependencies) {
@@ -26,35 +37,31 @@ class MidnightCredentialChain implements CredentialChainPort {
     return credentialLeafOf(credential)
   }
 
-  async issue(contractAddress: string, leaf: Uint8Array): Promise<IssueReceipt> {
-    const { zkConfig, issuerSecret, publicData, networkStepSeconds } = this.dependencies
-    const states = await withTimeout(
-      getPublicStates(publicData, contractAddress),
-      networkStepSeconds,
-      "reading the registry"
-    )
-    const zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
-    const call = await createUnprovenCallTxFromInitialStates(
-      zkConfig,
-      {
-        compiledContract,
-        circuitId: "issue",
-        contractAddress,
-        args: [leaf],
-        coinPublicKey: zswap.coinPublicKey,
-        initialContractState: states.contractState,
-        initialZswapChainState: states.zswapChainState,
-        ledgerParameters: states.ledgerParameters,
-        initialPrivateState: { role: "issuer", issuerSecret }
-      },
-      zswap.encryptionPublicKey
-    )
-    const confirmed = await submitSealTransaction(this.dependencies, call.private.unprovenTx, "an issue")
-
-    return { txId: confirmed.txId }
+  async issue(contractAddress: string, leaf: Uint8Array): Promise<RegistryReceipt> {
+    return this.call(contractAddress, "issue", [leaf], "an issue")
   }
 
   async locate(contractAddress: string, leaf: Uint8Array): Promise<bigint | undefined> {
+    return issuedLeafIndex((await this.registryLedger(contractAddress)).issued, leaf)
+  }
+
+  predicateIdOf(predicate: RegistryPredicate): Uint8Array {
+    return pureCircuits.predicateId(predicate)
+  }
+
+  async placed(contractAddress: string): Promise<PlacedPredicate[]> {
+    return placedPredicatesOf((await this.registryLedger(contractAddress)).predicates)
+  }
+
+  async approve(contractAddress: string, predicate: RegistryPredicate): Promise<RegistryReceipt> {
+    return this.call(contractAddress, "approvePredicate", [predicate], "a predicate approval")
+  }
+
+  async withdraw(contractAddress: string, id: Uint8Array): Promise<RegistryReceipt> {
+    return this.call(contractAddress, "withdrawPredicate", [id], "a predicate withdrawal")
+  }
+
+  private async registryLedger(contractAddress: string): Promise<Ledger> {
     const { publicData, networkStepSeconds } = this.dependencies
     const state = await withTimeout(
       publicData.queryContractState(contractAddress),
@@ -66,7 +73,39 @@ class MidnightCredentialChain implements CredentialChainPort {
       throw new Error(`the registry ${contractAddress} has no state`)
     }
 
-    return issuedLeafIndex(ledger(state.data).issued, leaf)
+    return ledger(state.data)
+  }
+
+  private async call<K extends RegistryCircuitId>(
+    contractAddress: string,
+    circuitId: K,
+    args: CompactContract.CircuitParameters<RegistryContract, K>,
+    what: string
+  ): Promise<RegistryReceipt> {
+    const { zkConfig, issuerSecret, publicData, networkStepSeconds } = this.dependencies
+    const states = await withTimeout(
+      getPublicStates(publicData, contractAddress),
+      networkStepSeconds,
+      "reading the registry"
+    )
+
+    const zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
+    const options = {
+      compiledContract,
+      circuitId,
+      contractAddress,
+      args,
+      coinPublicKey: zswap.coinPublicKey,
+      initialContractState: states.contractState,
+      initialZswapChainState: states.zswapChainState,
+      ledgerParameters: states.ledgerParameters,
+      initialPrivateState: { role: "issuer", issuerSecret }
+    } as CallOptionsWithPrivateState<RegistryContract, K>
+
+    const call = await createUnprovenCallTxFromInitialStates(zkConfig, options, zswap.encryptionPublicKey)
+    const confirmed = await submitSealTransaction(this.dependencies, call.private.unprovenTx, what)
+
+    return { txId: confirmed.txId }
   }
 }
 

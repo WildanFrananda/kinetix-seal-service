@@ -115,6 +115,7 @@ class InMemoryCredentialRegistry {
       ledgerParameters: LedgerParameters.initialParameters(),
       initialPrivateState
     } as CallOptionsWithPrivateState<Registry, K>
+
     const called = await createUnprovenCallTxFromInitialStates(zkConfig, options, this.zswap.encryptionPublicKey)
 
     this.state.data = new ChargedState(called.public.nextContractState)

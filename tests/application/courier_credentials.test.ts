@@ -100,6 +100,7 @@ describe("requesting a courier credential", () => {
       (await credentials.request({ principalId: "drv_1", role: "seller" }, holderKey, at)).kind,
       "not_a_courier"
     )
+
     assert.equal(store.credentials.length, 0)
     assert.deepEqual(metrics.requests, ["not_a_courier"])
   })
@@ -120,6 +121,7 @@ describe("requesting a courier credential", () => {
       (await credentials.request({ principalId: "drv_new", role: "courier" }, holderKey, at)).kind,
       "no_deliveries"
     )
+
     assert.equal(store.credentials.length, 0)
   })
 })
@@ -160,6 +162,7 @@ describe("a courier credential's status", () => {
       issueDay: 20_700,
       requestedAt: new Date("2026-09-03T00:00:00Z")
     })
+
     const newer = credentialRecord({ id: "00000000-0000-4000-8000-000000000002" })
 
     store.credentials.push(older, newer)

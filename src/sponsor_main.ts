@@ -50,6 +50,7 @@ const monitor = new SponsorMonitor(
   logger,
   config.sponsorThresholds
 )
+
 const readiness = new Readiness(new PrismaDatabaseProbe(prisma), monitor)
 const server = buildHttpServer({ service, readiness, registry, metrics, logger })
 const api = buildSponsorApi({
@@ -58,6 +59,7 @@ const api = buildSponsorApi({
   payer,
   logger
 })
+
 const stops: Array<() => void> = []
 
 onTermination(

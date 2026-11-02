@@ -45,6 +45,10 @@ function readServiceConfig(env: NodeJS.ProcessEnv): ServiceConfig {
       issueSeconds: read.positiveInteger("KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS"),
       factsMaxAgeSeconds: read.positiveInteger("KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS")
     },
+    predicates: {
+      periodDays: read.positiveIntegerAtMost("KINETIX_SEAL_PREDICATE_PERIOD_DAYS", 365),
+      reconcileSeconds: read.positiveInteger("KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS")
+    },
     registryCheckSeconds: read.positiveInteger("KINETIX_SEAL_REGISTRY_CHECK_SECONDS"),
     midnightStepSeconds: read.positiveInteger("KINETIX_SEAL_MIDNIGHT_STEP_SECONDS"),
     shutdownGraceSeconds: read.positiveInteger("KINETIX_SEAL_SHUTDOWN_GRACE_SECONDS")

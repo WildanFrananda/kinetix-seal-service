@@ -12,6 +12,7 @@ const requestOutcomes: readonly CredentialRequestKind[] = [
   "no_deliveries",
   "issued_today"
 ]
+
 const issuanceOutcomes: readonly IssuanceOutcome[] = ["issued", "failed"]
 
 class PrometheusCredentialMetrics implements CredentialMetricsPort {
@@ -25,6 +26,7 @@ class PrometheusCredentialMetrics implements CredentialMetricsPort {
       labelNames: ["outcome"],
       registers: [registry]
     })
+
     this.issuances = new Counter({
       name: "kinetix_seal_credential_issuances_total",
       help: "Credential issue transactions, by outcome",

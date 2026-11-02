@@ -8,6 +8,8 @@ import CourierCredentials from "./application/courier_credentials.service.ts"
 import CourierFacts from "./application/courier_facts.service.ts"
 import CredentialIssuer from "./application/credential_issuer.service.ts"
 import type { LoggerPort } from "./application/ports/logger.port.ts"
+import PredicateCatalogue from "./application/predicate_catalogue.service.ts"
+import PredicateKeeper from "./application/predicate_keeper.service.ts"
 import Readiness from "./application/readiness.service.ts"
 import RegistryGenerations from "./application/registry_generations.service.ts"
 import RemoteSponsorStatus from "./application/remote_sponsor_status.service.ts"
@@ -16,6 +18,7 @@ import GrpcDeliveryFeed from "./infrastructure/grpc/grpc_delivery_feed.adapter.t
 import GrpcReviewFeed from "./infrastructure/grpc/grpc_review_feed.adapter.ts"
 import { registerCredentialRoutes } from "./infrastructure/http/credential_routes.ts"
 import { buildHttpServer } from "./infrastructure/http/http_server.ts"
+import { registerPredicateRoutes } from "./infrastructure/http/predicate_routes.ts"
 import JoseTokenVerifier from "./infrastructure/identity/jose_token_verifier.adapter.ts"
 import { loadMeshIdentity } from "./infrastructure/mesh/mesh_identity.ts"
 import { withProjectId } from "./infrastructure/midnight/blockfrost_url.ts"
@@ -29,12 +32,15 @@ import { estateMetrics } from "./infrastructure/observability/estate_metrics.ts"
 import JsonLogger from "./infrastructure/observability/json_logger.ts"
 import PrometheusCredentialMetrics from "./infrastructure/observability/prometheus_credential_metrics.adapter.ts"
 import PrometheusFeedMetrics from "./infrastructure/observability/prometheus_feed_metrics.adapter.ts"
+import PrometheusPredicateMetrics from "./infrastructure/observability/prometheus_predicate_metrics.adapter.ts"
 import PrometheusRegistryGauges from "./infrastructure/observability/prometheus_registry_gauges.adapter.ts"
 import { redactOutput } from "./infrastructure/observability/redacting_output.ts"
 import { createPrismaClient } from "./infrastructure/postgres/prisma_client.ts"
 import PrismaCourierFactStore from "./infrastructure/postgres/prisma_courier_fact_store.adapter.ts"
 import PrismaCredentialStore from "./infrastructure/postgres/prisma_credential_store.adapter.ts"
 import PrismaDatabaseProbe from "./infrastructure/postgres/prisma_database_probe.adapter.ts"
+import PrismaPredicatePlacementStore from "./infrastructure/postgres/prisma_predicate_placement_store.adapter.ts"
+import PrismaPredicateTemplateStore from "./infrastructure/postgres/prisma_predicate_template_store.adapter.ts"
 import PrismaRegistryGenerationStore from "./infrastructure/postgres/prisma_registry_generation_store.adapter.ts"
 import { repeat } from "./infrastructure/scheduling/repeat.ts"
 import { onTermination } from "./infrastructure/shutdown/on_termination.ts"
@@ -70,12 +76,14 @@ const courierFacts = new CourierFacts(
   logger,
   { pageSize: config.facts.pageSize, pagesPerTick: config.facts.pagesPerTick }
 )
+
 const sponsor = new HttpsSponsorClient(
   config.sponsor.url,
   meshIdentity,
   config.sponsor.timeoutSeconds,
   config.midnightStepSeconds
 )
+
 const sponsorStatus = new RemoteSponsorStatus(sponsor, logger)
 const readiness = new Readiness(new PrismaDatabaseProbe(prisma), sponsorStatus)
 const zkConfig = new NodeZkConfigProvider<string>(credentialRegistryDirectory)
@@ -83,6 +91,7 @@ const publicData = indexerPublicDataProvider(
   withProjectId(config.midnight.indexerHttpUrl, config.blockfrostProjectId),
   withProjectId(config.midnight.indexerWsUrl, config.blockfrostProjectId)
 )
+
 const proofs = httpClientProofProvider(config.midnight.proofServerUrl, zkConfig)
 const generationStore = new PrismaRegistryGenerationStore(prisma)
 const credentialStore = new PrismaCredentialStore(prisma)
@@ -103,21 +112,39 @@ const registryGenerations = new RegistryGenerations(
   config.midnight.networkId,
   await contractBuildDigest(credentialRegistryDirectory)
 )
+
+const registryChain = new MidnightCredentialChain({
+  payer: sponsor,
+  publicData,
+  proofs,
+  zkConfig,
+  issuerSecret: config.issuerSecret,
+  networkStepSeconds: config.midnightStepSeconds
+})
+
 const credentialIssuer = new CredentialIssuer(
-  new MidnightCredentialChain({
-    payer: sponsor,
-    publicData,
-    proofs,
-    zkConfig,
-    issuerSecret: config.issuerSecret,
-    networkStepSeconds: config.midnightStepSeconds
-  }),
+  registryChain,
   credentialStore,
   generationStore,
   credentialMetrics,
   logger,
   now
 )
+
+const predicateTemplates = new PrismaPredicateTemplateStore(prisma)
+const predicatePlacements = new PrismaPredicatePlacementStore(prisma)
+const predicateKeeper = new PredicateKeeper({
+  chain: registryChain,
+  templates: predicateTemplates,
+  placements: predicatePlacements,
+  generations: generationStore,
+  metrics: new PrometheusPredicateMetrics(registry),
+  logger,
+  clock: now,
+  periodDays: config.predicates.periodDays
+})
+
+const tokens = new JoseTokenVerifier(config.identity)
 const server = buildHttpServer({ service, readiness, registry, metrics, logger })
 
 registerCredentialRoutes(server, {
@@ -128,11 +155,27 @@ registerCredentialRoutes(server, {
     credentialMetrics,
     config.credentials.factsMaxAgeSeconds
   ),
-  tokens: new JoseTokenVerifier(config.identity),
+  tokens,
   logger,
   metrics,
   clock: now
 })
+
+registerPredicateRoutes(server, {
+  predicates: new PredicateCatalogue({
+    chain: registryChain,
+    templates: predicateTemplates,
+    placements: predicatePlacements,
+    generations: generationStore,
+    logger,
+    periodDays: config.predicates.periodDays
+  }),
+  tokens,
+  logger,
+  metrics,
+  clock: now
+})
+
 const stops: Array<() => void> = []
 
 onTermination(
@@ -198,6 +241,20 @@ stops.push(
 
     await credentialIssuer.settle().catch((error: unknown) => {
       logger.error({ message: "the credential queue could not be settled" }, error)
+    })
+  })
+)
+
+stops.push(
+  repeat(config.predicates.reconcileSeconds, async () => {
+    const condition = sponsorStatus.condition()
+
+    if (condition === "syncing" || condition === "unreachable") {
+      return
+    }
+
+    await predicateKeeper.reconcile().catch((error: unknown) => {
+      logger.error({ message: "the registry's predicates could not be reconciled" }, error)
     })
   })
 )

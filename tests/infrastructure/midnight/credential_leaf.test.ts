@@ -29,6 +29,7 @@ describe("the leaf seal issues", () => {
       holderPublicKey: pureCircuits.holderPublicKey(holderSecret),
       salt: randomBytes(32)
     })
+
     const leaf = credentialLeafOf(record)
 
     await registry.approvePredicate(predicate, issuer)
@@ -40,6 +41,7 @@ describe("the leaf seal issues", () => {
       credential: { classId: record.classId, attributes: record.attributes, salt: record.salt },
       leafIndex: 0n
     }
+
     const challenge = randomBytes(32)
 
     await registry.present(challenge, pureCircuits.predicateId(predicate), holder)
@@ -54,6 +56,7 @@ describe("the leaf seal issues", () => {
       credentialRecord({ salt: new Uint8Array(32).fill(8) }),
       credentialRecord({ holderPublicKey: base.holderPublicKey + 1n })
     ]
+
     const leaves = new Set([base, ...variants].map((record) => Buffer.from(credentialLeafOf(record)).toString("hex")))
 
     assert.equal(leaves.size, 4)

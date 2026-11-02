@@ -52,6 +52,7 @@ describe("sponsor events in Postgres", () => {
       dustCoins: 1,
       nightUtxos: 1
     })
+
     await store.record({
       occurredAt: new Date("2026-10-22T02:00:00Z"),
       condition: "no_dust",

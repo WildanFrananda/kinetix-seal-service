@@ -96,6 +96,7 @@ describe("the link between seal and its sponsor", () => {
       clientAs("seal", sponsor.url).pay(Uint8Array.from([1])),
       /503: the sponsor wallet is still syncing/
     )
+
     assert.equal(sponsor.payer.paid.length, 0)
   })
 

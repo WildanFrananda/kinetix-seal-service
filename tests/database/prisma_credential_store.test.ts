@@ -22,6 +22,7 @@ const lastMonth = credentialRecord({
   issueDay: 20_729,
   requestedAt: new Date("2026-10-03T03:00:00Z")
 })
+
 const otherCourier = credentialRecord({ id: "00000000-0000-4000-8000-000000000003", principalId: "drv_2" })
 
 describe("credentials in Postgres", () => {
@@ -73,6 +74,7 @@ describe("credentials in Postgres", () => {
       leafIndex: undefined,
       txId: undefined
     })
+
     assert.equal(await store.queueCurrent(2, queuedAt), 2)
   })
 

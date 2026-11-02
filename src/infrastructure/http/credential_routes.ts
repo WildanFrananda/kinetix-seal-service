@@ -1,26 +1,19 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
+import type { FastifyInstance } from "fastify"
 
+import { hexOf } from "../../domain/hex.ts"
 import { parseHolderPublicKey } from "../../domain/holder_public_key.ts"
-import type { CallerPrincipal } from "../../types/caller_principal.type.ts"
 import type { CredentialRouteDependencies } from "../../types/credential_route_dependencies.type.ts"
 import type { CredentialStatus } from "../../types/credential_status.type.ts"
 import type { CredentialView } from "../../types/credential_view.type.ts"
-import type { ProblemBody } from "../../types/problem_body.type.ts"
+import { callerOf } from "./caller_of.ts"
+import { isLowercaseUuid } from "./lowercase_uuid.ts"
+import { problem } from "./problem.ts"
 import { routeTemplate } from "./route_template.ts"
 
 const collectionRoute = "/api/v1/seal/courier-credentials"
 const memberRoute = "/api/v1/seal/courier-credentials/:id"
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const requestBodyLimit = 1024
 const factsRetryAfterSeconds = 60
-
-function problem(error: string, message: string, traceId: string): ProblemBody {
-  return { error, message, traceId }
-}
-
-function hexOf(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("hex")
-}
 
 function viewOf(status: CredentialStatus): CredentialView {
   const { credential, standing, placement } = status
@@ -59,36 +52,6 @@ function holderPublicKeyOf(body: unknown): bigint | undefined {
   }
 
   return typeof body.holderPublicKey === "string" ? parseHolderPublicKey(body.holderPublicKey) : undefined
-}
-
-async function callerOf(
-  dependencies: CredentialRouteDependencies,
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<CallerPrincipal | undefined> {
-  const verdict = await dependencies.tokens.verify(request.headers.authorization)
-
-  if (verdict.kind === "principal") {
-    return verdict.principal
-  }
-
-  if (verdict.kind === "unavailable") {
-    dependencies.logger.warn({
-      message: "identity's signing keys could not be read",
-      requestId: request.id,
-      fields: { cause: verdict.reason }
-    })
-    await reply.code(503).send(problem("IDENTITY_UNAVAILABLE", "the token cannot be checked now", request.id))
-
-    return undefined
-  }
-
-  await reply
-    .code(401)
-    .header("WWW-Authenticate", "Bearer")
-    .send(problem("TOKEN_REFUSED", "a valid access token is required", request.id))
-
-  return undefined
 }
 
 function registerCredentialRoutes(server: FastifyInstance, dependencies: CredentialRouteDependencies): void {
@@ -162,7 +125,7 @@ function registerCredentialRoutes(server: FastifyInstance, dependencies: Credent
       return reply
     }
 
-    const status = uuid.test(request.params.id)
+    const status = isLowercaseUuid(request.params.id)
       ? await dependencies.credentials.status(caller, request.params.id)
       : undefined
 

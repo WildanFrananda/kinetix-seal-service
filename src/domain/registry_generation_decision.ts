@@ -19,6 +19,7 @@ function decideRegistryGeneration(
   const interrupted: RegistryRetirement[] = generations
     .filter((generation) => generation.status === "deploying")
     .map((generation) => ({ generation: generation.generation, reason: "interrupted" }))
+
   const active = generations.find((generation) => generation.status === "active")
 
   if (active === undefined) {

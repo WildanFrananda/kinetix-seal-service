@@ -51,6 +51,7 @@ describe("reading the sponsor's configuration", () => {
       () => readSponsorConfig({ ...complete, KINETIX_SEAL_HTTP_PORT: "80a" }),
       /KINETIX_SEAL_HTTP_PORT must be a positive integer/
     )
+
     assert.throws(
       () => readSponsorConfig({ ...complete, KINETIX_SEAL_NODE_WS_URL: "http://rpc.midnight-preprod.blockfrost.io" }),
       /KINETIX_SEAL_NODE_WS_URL must be a wss: URL/

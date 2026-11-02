@@ -1,6 +1,6 @@
 import type { CredentialChainPort } from "../../src/application/ports/credential_chain.port.ts"
 import type { CredentialRecord } from "../../src/types/credential_record.type.ts"
-import type { IssueReceipt } from "../../src/types/issue_receipt.type.ts"
+import type { RegistryReceipt } from "../../src/types/registry_receipt.type.ts"
 
 function hexOf(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex")
@@ -21,7 +21,7 @@ class FakeCredentialChain implements CredentialChainPort {
     return leaf
   }
 
-  async issue(_contractAddress: string, leaf: Uint8Array): Promise<IssueReceipt> {
+  async issue(_contractAddress: string, leaf: Uint8Array): Promise<RegistryReceipt> {
     this.submitted.push(hexOf(leaf))
 
     if (this.issueFails !== undefined) {

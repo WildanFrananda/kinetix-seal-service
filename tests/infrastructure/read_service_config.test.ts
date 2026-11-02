@@ -33,7 +33,9 @@ const complete: NodeJS.ProcessEnv = {
   JWT_AUDIENCE: "kinetix",
   KINETIX_SEAL_JWKS_TIMEOUT_SECONDS: "10",
   KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS: "30",
-  KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS: "300"
+  KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS: "300",
+  KINETIX_SEAL_PREDICATE_PERIOD_DAYS: "7",
+  KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS: "300"
 }
 
 describe("reading the service's configuration", () => {
@@ -51,7 +53,23 @@ describe("reading the service's configuration", () => {
       audience: "kinetix",
       timeoutSeconds: 10
     })
+
     assert.deepEqual(config.credentials, { issueSeconds: 30, factsMaxAgeSeconds: 300 })
+    assert.deepEqual(config.predicates, { periodDays: 7, reconcileSeconds: 300 })
+  })
+
+  it("needs the predicate settings, a period of at most a year", () => {
+    const { KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS: _reconcile, ...rest } = complete
+
+    assert.throws(
+      () => readServiceConfig(rest),
+      /KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS is required and has no default/
+    )
+
+    assert.throws(
+      () => readServiceConfig({ ...complete, KINETIX_SEAL_PREDICATE_PERIOD_DAYS: "366" }),
+      /KINETIX_SEAL_PREDICATE_PERIOD_DAYS must be at most 365/
+    )
   })
 
   it("needs identity's keys and the credential settings, with no default", () => {
@@ -77,14 +95,17 @@ describe("reading the service's configuration", () => {
       () => readServiceConfig({ ...complete, KINETIX_SEAL_SPONSOR_URL: "http://kinetix-seal-sponsor:8014" }),
       /KINETIX_SEAL_SPONSOR_URL must be a https: URL/
     )
+
     assert.throws(
       () => readServiceConfig({ ...complete, KINETIX_SEAL_FEED_PAGE_SIZE: "501" }),
       /KINETIX_SEAL_FEED_PAGE_SIZE must be at most 500/
     )
+
     assert.throws(
       () => readServiceConfig({ ...complete, KINETIX_SEAL_MATCHING_GRPC_ADDR: "https://kinetix-matching-service" }),
       /KINETIX_SEAL_MATCHING_GRPC_ADDR must be host:port/
     )
+
     assert.throws(
       () => readServiceConfig({ ...complete, KINETIX_TRUST_DOMAIN: " , " }),
       /KINETIX_TRUST_DOMAIN must name at least one value/

@@ -37,6 +37,7 @@ class MidnightRegistryChain implements RegistryChainPort {
       },
       zswap.encryptionPublicKey
     )
+
     const dependencies = this.dependencies
 
     return {

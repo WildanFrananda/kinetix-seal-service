@@ -21,27 +21,32 @@ class PrometheusSponsorGauges implements SponsorGaugesPort {
       help: "1 when the sponsor wallet has caught up with the chain",
       registers: [registry]
     })
+
     this.dustBalance = new Gauge({
       name: "kinetix_seal_sponsor_dust_balance",
       help: "DUST the sponsor wallet can spend now, in DUST",
       registers: [registry]
     })
+
     this.dustCoins = new Gauge({
       name: "kinetix_seal_sponsor_dust_coins",
       help: "DUST coins the sponsor wallet can spend now",
       registers: [registry]
     })
+
     this.nightUtxos = new Gauge({
       name: "kinetix_seal_sponsor_night_utxos",
       help: "NIGHT UTXOs the sponsor wallet holds",
       registers: [registry]
     })
+
     this.condition = new Gauge({
       name: "kinetix_seal_sponsor_condition",
       help: "1 for the sponsor wallet's current condition, 0 for the others",
       labelNames: ["condition"],
       registers: [registry]
     })
+
     this.restoreSeconds = new Gauge({
       name: "kinetix_seal_sponsor_restore_seconds",
       help: "How long the sponsor wallet took to restore its saved state at start",

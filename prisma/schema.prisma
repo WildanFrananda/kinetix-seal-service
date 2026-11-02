@@ -100,3 +100,29 @@ model CredentialIssuance {
   @@index([generation, status, queuedAt])
   @@map("credential_issuances")
 }
+
+model PredicateTemplate {
+  id            String    @id @db.Uuid
+  classId       String    @map("class_id") @db.Char(64)
+  label         String    @db.VarChar(80)
+  minimums      BigInt[]
+  freshnessDays Int       @map("freshness_days")
+  approvedBy    String    @map("approved_by") @db.VarChar(128)
+  approvedAt    DateTime  @map("approved_at") @db.Timestamptz(6)
+  withdrawnBy   String?   @map("withdrawn_by") @db.VarChar(128)
+  withdrawnAt   DateTime? @map("withdrawn_at") @db.Timestamptz(6)
+
+  @@index([classId, withdrawnAt])
+  @@map("predicate_templates")
+}
+
+model PredicatePlacement {
+  generation  Int
+  predicateId String   @map("predicate_id") @db.Char(64)
+  classId     String   @map("class_id") @db.Char(64)
+  minimums    BigInt[]
+  observedAt  DateTime @map("observed_at") @db.Timestamptz(6)
+
+  @@id([generation, predicateId])
+  @@map("predicate_placements")
+}

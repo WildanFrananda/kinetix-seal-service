@@ -77,6 +77,7 @@ class FakeCredentialStore implements CredentialStorePort {
         leafIndex: undefined,
         txId: undefined
       })
+
       queued += 1
     }
 

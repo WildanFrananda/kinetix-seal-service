@@ -8,9 +8,10 @@ Today it runs, for real:
 - the sponsor wallet that pays every DUST fee, in its own process (SEAL-D17);
 - the credential registry's generations on Preprod (S1a);
 - the courier facts, read from matching and review over the mesh (S1b);
-- courier credentials: a courier asks, seal issues a snapshot of their facts into the registry (S1d).
+- courier credentials: a courier asks, seal issues a snapshot of their facts into the registry (S1d);
+- predicates: an admin approves the minimums a holder may be asked to prove, seal keeps them in the registry (S1e).
 
-What S1 still lacks is the holder's page, the verifier's page and the admin's predicates ("Not built yet").
+What S1 still lacks is the holder's page and the verifier's page ("Not built yet").
 
 ## Everything runs in Docker
 
@@ -68,6 +69,11 @@ test. It refuses to start without the toolchain's database: a skipped database t
   `biome-plugins/no_private_names.grit` refuses `#` in a declaration and in an access. A private member never
   shares its name with a public one; the four that did were renamed (`drainStream`, `reconcileOnce`, `payNow`,
   `delegate`).
+- **The house layout's blank lines** (the user's rule, every repository): `scripts/check_layout.ts`, copied from the
+  backoffice and run by `bin/ci`, parses every source with `@babel/parser` and refuses a statement cuddled after a
+  multi-line one, a check or loop cuddled after a statement it does not read, a cuddled `return` that ends a longer
+  block, and a blank line just inside a block's braces. `node scripts/check_layout.ts --fix` inserts or removes the
+  blank lines and touches nothing else. An assignment stays cuddled with the check that reads it.
 - **English only.**
 
 ## Conventions
@@ -304,6 +310,48 @@ contracts/
 - **Not handled yet:** a courier suspended by identity keeps the credentials it has. Identity publishes no standing
   for couriers today (infra `docs/MERCHANT-SUSPENSION.md`, D1–D5 owed).
 
+### Predicates (S1e)
+
+SEAL-D7: anyone may verify, but only against minimums an admin approved. `present` takes a predicate id and the
+contract looks the minimums up in its own `predicates` map, so the chain refuses minimums nobody approved (G3,
+finding 1); a verifier cannot narrow a holder's values down with arbitrary thresholds.
+
+- **A predicate template** is what an admin approves (`predicate_templates`): a class, a label, a minimum for each
+  of the class's first three attributes, and a freshness window in days. Every class's fourth attribute is its
+  issue day, so freshness is that attribute's minimum and is derived, never typed in. Bounds are the class's
+  (`credential_classes.ts`): for couriers deliveries up to 1,000,000, rating in hundredths up to 500, days active
+  up to 36,525; freshness 1 to 365 days; a label of 1 to 80 printable characters. A live duplicate (same class,
+  minimums and window) is `PREDICATE_EXISTS`; a class holds at most eight live templates (`TOO_MANY_PREDICATES`).
+  The approval takes a transaction-scoped advisory lock, so two admins racing cannot pass either rule.
+- **Registry rows come from templates.** Days are grouped into periods of `KINETIX_SEAL_PREDICATE_PERIOD_DAYS`
+  counted from day 0. A template's row for a period has the template's three minimums and, fourth, the period's
+  first day less the freshness window (never below 0). The current period's row and the previous one are wanted,
+  so a presentation started before a rollover still lands; a row's id is the contract's `predicateId`, a hash of
+  its content, so one id never means other minimums. With seven-day periods, a presentation under the current row
+  proves a credential issued at most freshness + 6 days earlier, under the previous one freshness + 13.
+- **The registry is reconciled** (`PredicateKeeper`, every `KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS`, while the
+  sponsor is past `syncing`). It reads the active registry's `predicates` map, approves each wanted row the map
+  lacks, then withdraws each row it holds that no live template wants, one transaction at a time, stopping at the
+  first failure. The chain is the only state: there is no queue and no `uncertain` row, because the next tick
+  reads again, and a new generation gets its rows on its first tick. Approving before withdrawing means a
+  rollover never leaves a template without a current row. Rows the registry holds are mirrored in
+  `predicate_placements` after every reading and change, for the public list.
+- **Routes.** `GET /api/v1/seal/predicates` (the live templates, their rows with ids, minimums as decimal strings,
+  the minimum issue day and date, which is current and which the registry holds, and the active registry) and
+  `GET /api/v1/seal/predicates/{id}` (a withdrawn one too, with no rows) are public, with no token, `Cache-Control:
+  public, max-age=60`. `POST /api/v1/seal/predicates` with `{ "class": "courier", "label": …, "minimums": {
+  "deliveries": …, "ratingHundredths": …, "daysActive": … }, "freshnessDays": … }` answers `201` with `Location`;
+  `DELETE /api/v1/seal/predicates/{id}` answers `204`, a repeat too. Both need role `admin` (`ADMIN_REQUIRED`
+  403), which identity issues only after two factors, and the gateway serves them on the staff network only.
+  Errors as in S1d, plus `PREDICATE_EXISTS` and `TOO_MANY_PREDICATES` (409) and `NOT_FOUND` (404).
+- **Withdrawal** stops new presentations under the template's rows at the next reconcile; what was proven under
+  them stays readable in `presentations`.
+- **Logs** name the template and the admin for each approval and withdrawal, and the generation, predicate id and
+  transaction for each registry change. Metrics: `kinetix_seal_predicate_changes_total{change,outcome}` and
+  `kinetix_seal_predicate_drift`, the rows still to approve or withdraw at the last reconcile.
+- The registry adapter (`MidnightCredentialChain`) serves both the issuer and the keeper; each circuit call reads
+  the registry's state, builds the call, and goes through the same prove, pay and confirm path.
+
 ## Prisma
 
 - Prisma ORM 7.10.0 with `@prisma/adapter-pg`. The `prisma-client` generator writes TypeScript into
@@ -349,8 +397,7 @@ contracts/
 
 ## Not built yet
 
-- Predicates: an admin approving a threshold, and seal writing it to the registry (`approvePredicate`), again in
-  every new generation (S1e).
+- The backoffice screen for predicates; an admin calls the endpoints directly until then.
 - The holder's page, in the courier app's WebView (SEAL-D8): the holder secret, `present` proved with the WASM
   prover, the transaction handed to the sponsor (S1f). Its bundle decides SEAL-D9.
 - The public verifier page: a challenge, an approved predicate, and the challenge read back as answered (S1g).

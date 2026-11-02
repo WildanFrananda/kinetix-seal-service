@@ -18,6 +18,7 @@ class PrometheusFeedMetrics implements FeedMetricsPort {
       labelNames: ["stream"],
       registers: [registry]
     })
+
     this.failures = new Counter({
       name: "kinetix_seal_feed_failures_total",
       help: "Fact feed reads that stopped short, by stream and kind",

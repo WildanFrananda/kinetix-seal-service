@@ -45,6 +45,7 @@ class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort
       { transaction: Buffer.from(unboundTransaction).toString("hex") },
       this.payTimeoutSeconds
     )
+
     const txId = (body as { txId?: unknown } | null)?.txId
 
     if (typeof txId !== "string" || txId === "") {
@@ -76,6 +77,7 @@ class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort
           response.on("data", (chunk: Buffer) => {
             chunks.push(chunk)
           })
+
           response.on("end", () => {
             const text = Buffer.concat(chunks).toString("utf8")
             const parsed: unknown = text === "" ? null : JSON.parse(text)
@@ -100,6 +102,7 @@ class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort
       outgoing.on("timeout", () => {
         outgoing.destroy(new Error(`the sponsor did not answer ${method} ${path} within ${timeoutSeconds} s`))
       })
+
       outgoing.on("error", reject)
       outgoing.end(payload)
     })
