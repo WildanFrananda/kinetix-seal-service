@@ -1,4 +1,6 @@
+import type { CredentialsConfig } from "./credentials_config.type.ts"
 import type { FactsConfig } from "./facts_config.type.ts"
+import type { IdentityTokenConfig } from "./identity_token_config.type.ts"
 import type { LogLevel } from "./log_level.type.ts"
 import type { MeshConfig } from "./mesh_config.type.ts"
 import type { ServiceMidnightEndpoints } from "./service_midnight_endpoints.type.ts"
@@ -15,6 +17,8 @@ type ServiceConfig = {
   mesh: MeshConfig
   facts: FactsConfig
   sponsor: SponsorLinkConfig
+  identity: IdentityTokenConfig
+  credentials: CredentialsConfig
   registryCheckSeconds: number
   midnightStepSeconds: number
   shutdownGraceSeconds: number

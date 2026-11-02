@@ -35,6 +35,16 @@ function readServiceConfig(env: NodeJS.ProcessEnv): ServiceConfig {
       pollSeconds: read.positiveInteger("KINETIX_SEAL_SPONSOR_POLL_SECONDS"),
       timeoutSeconds: read.positiveInteger("KINETIX_SEAL_SPONSOR_TIMEOUT_SECONDS")
     },
+    identity: {
+      jwksUrl: read.url("IDENTITY_JWKS_URL", ["http:", "https:"]),
+      issuer: read.text("JWT_ISSUER"),
+      audience: read.text("JWT_AUDIENCE"),
+      timeoutSeconds: read.positiveInteger("KINETIX_SEAL_JWKS_TIMEOUT_SECONDS")
+    },
+    credentials: {
+      issueSeconds: read.positiveInteger("KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS"),
+      factsMaxAgeSeconds: read.positiveInteger("KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS")
+    },
     registryCheckSeconds: read.positiveInteger("KINETIX_SEAL_REGISTRY_CHECK_SECONDS"),
     midnightStepSeconds: read.positiveInteger("KINETIX_SEAL_MIDNIGHT_STEP_SECONDS"),
     shutdownGraceSeconds: read.positiveInteger("KINETIX_SEAL_SHUTDOWN_GRACE_SECONDS")

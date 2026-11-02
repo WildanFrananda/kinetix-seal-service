@@ -2,7 +2,8 @@
 
 Seal proves facts without revealing the data behind them, with Compact contracts on Midnight Preprod. It will
 offer portable reputation credentials (S1), sealed-bid auctions (S2) and verified anonymous reports (S3). Today
-it is the skeleton: the sponsor wallet that pays holders' DUST fees, kept synced, observable and recorded.
+it runs the sponsor wallet that pays DUST fees, the credential registry on Preprod, the courier facts from
+matching and review, and courier credentials: a courier asks, and seal issues a snapshot of their facts.
 
 - Plan and rulings: `kinetix-infrastructure/docs/SEAL-SERVICE.md`.
 - Conventions and traps: `CLAUDE.md`.
@@ -16,6 +17,7 @@ it is the skeleton: the sponsor wallet that pays holders' DUST fees, kept synced
 | HTTP | Fastify 5.12.5 |
 | database | PostgreSQL 16 through Prisma ORM 7.10.0 and `@prisma/adapter-pg` |
 | Midnight | wallet SDK 1.2.0, midnight-js 4.1.1, Preprod through Blockfrost |
+| tokens | jose 6.2.12, against identity's published keys |
 | metrics | prom-client 15.1.3 |
 | lint and format | Biome 2.5.15 |
 | tests | `node:test`, hand-written fakes, real Postgres |
@@ -33,7 +35,9 @@ It runs in Docker, as on CI: install, generate, Biome, `tsc`, migrate twice, the
 The image serves HTTP on `KINETIX_SEAL_HTTP_PORT`:
 - `/health`: liveness;
 - `/health/ready`: 200 when Postgres answers and the sponsor wallet is synced;
-- `/metrics`: Prometheus.
+- `/metrics`: Prometheus;
+- `POST /api/v1/seal/courier-credentials` and `GET /api/v1/seal/courier-credentials/{id}`: a courier's credentials,
+  with identity's access token (the contract is in `CLAUDE.md`, "Courier credentials").
 
 The migrator is the same image:
 

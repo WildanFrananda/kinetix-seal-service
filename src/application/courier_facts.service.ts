@@ -74,7 +74,7 @@ class CourierFacts {
       const page = await this.deliveries.deliveriesSince(after, this.limits.pageSize)
 
       this.assertValid(after, page)
-      await this.store.recordDeliveries(after, page.next, page.records)
+      await this.store.recordDeliveries(after, page.next, page.records, !page.hasMore)
       this.metrics.recorded(stream, page.records.length)
 
       return page.hasMore
@@ -86,7 +86,7 @@ class CourierFacts {
 
     const driverReviews = page.records.filter((review) => review.kind === "driver")
 
-    await this.store.recordDriverReviews(after, page.next, driverReviews)
+    await this.store.recordDriverReviews(after, page.next, driverReviews, !page.hasMore)
     this.metrics.recorded(stream, driverReviews.length)
 
     return page.hasMore
