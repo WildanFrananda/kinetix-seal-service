@@ -4,11 +4,13 @@ Seal proves facts without revealing the data behind them, with Compact contracts
 plan, the rulings (SEAL-D1 to D11) and the gates are in `kinetix-infrastructure/docs/SEAL-SERVICE.md`; the
 measurements behind them come from the lab harness `kinetix-seal-spike/` at the estate root.
 
-This repository is the service skeleton (plan §11 step 3). It runs one thing for real: the sponsor wallet that
-will pay every holder's DUST fee. It keeps the wallet synced and its state on a volume. It reports DUST health
-through `/health/ready` and `/metrics`, and records every change of condition in Postgres. No feature exists
-yet: the gRPC server, the mesh certificate and the watcher arrive with S1, which has the first RPC and the
-first contract to watch.
+Today it runs, for real:
+- the sponsor wallet that pays every DUST fee, in its own process (SEAL-D17);
+- the credential registry's generations on Preprod (S1a);
+- the courier facts, read from matching and review over the mesh (S1b);
+- courier credentials: a courier asks, seal issues a snapshot of their facts into the registry (S1d).
+
+What S1 still lacks is the holder's page, the verifier's page and the admin's predicates ("Not built yet").
 
 ## Everything runs in Docker
 
@@ -254,6 +256,54 @@ contracts/
 - **Witnesses** (`src/infrastructure/midnight/credential_registry_witnesses.ts`) refuse a secret to the wrong
   role: the issuer's private state answers only `issuerSecret`; a holder's answers the rest.
 
+### Courier credentials (S1d)
+
+- **The route** is `POST /api/v1/seal/courier-credentials`, behind the gateway, which forwards the path whole. The
+  body is exactly `{ "holderPublicKey": "<decimal>" }`: `holderPublicKey(secret)` of the contract, a field element,
+  computed on the holder's device. The secret never leaves the device (SEAL-D16's default). The answer is the
+  credential and where it stands: `202` with `Location` for a new one, `200` for a repeat from the same key.
+  `GET /api/v1/seal/courier-credentials/{id}` shows it to its holder only; anyone else, and an id that is not a
+  lowercase UUID, gets `404`. Errors are `{ error, message, traceId }`: `TOKEN_REFUSED` 401, `IDENTITY_UNAVAILABLE`
+  503, `COURIER_REQUIRED` 403, `INVALID_REQUEST` 400, `NO_DELIVERIES` 409, `ISSUED_TODAY` 409, `FACTS_UNAVAILABLE`
+  503 with `Retry-After`, `NOT_FOUND` 404. Both routes answer `Cache-Control: no-store`.
+- **Seal checks identity's token itself** (`JoseTokenVerifier`, jose 6.2.12, MIT): RS256 only, against
+  `IDENTITY_JWKS_URL`, `JWT_ISSUER` and `JWT_AUDIENCE`, the estate's own names, with 30 s of clock skew, and
+  `token_use` must be `access`. Kong checks the signature too, but only seal can tell a refresh token from an
+  access token. Keys it cannot fetch are `IDENTITY_UNAVAILABLE`, never a refused token. Only the `courier` role
+  gets a courier credential; the principal is `sub`, the same id matching's deliveries carry.
+- **The credential is a snapshot** of seal's own fact tables, never a call to matching or review at request time:
+  the deliveries, the average driver rating in hundredths rounded down (0 when nobody rated the courier), the days
+  since the first delivery (SEAL-D14), and the issue day (UTC days since the epoch). The class is
+  `kinetix:seal:courier:v1`, padded to 32 bytes, as the contract tests name it. The salt is 32 random bytes.
+- **Facts must be current.** `feed_cursors.caught_up_at` is written when a page says there is no more. A request is
+  refused `FACTS_UNAVAILABLE` unless both streams caught up within `KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS`:
+  a feed that is down or behind would otherwise state an old count as today's.
+- **One credential per courier, class and day** (a unique key). A repeat with the same holder key returns that
+  credential; another key that day is `ISSUED_TODAY`. Older credentials are not revoked: `revoke` resets the tree's
+  history for every holder, and a snapshot stays true for its issue day, which predicates bound.
+- **Issuance is a queue** (`CredentialIssuer`, every `KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS`, while the sponsor is
+  past `syncing`). `queueCurrent` gives each courier's newest credential a `pending` row in the active generation.
+  Rows are settled one at a time, in order, and the tick stops at the first failure:
+  1. the row becomes `uncertain`, with its leaf, before anything is submitted;
+  2. `issue(leaf)` is proved by the proof server and paid by the sponsor, as the registry's deploy is;
+  3. the leaf's index is read back from the registry's state.
+
+  An `uncertain` row is looked up in the registry before it is submitted again, so a timeout that landed is
+  recorded, not issued twice. One that did not land is submitted again; if the first one lands later anyway, the
+  leaf is in the tree twice, which costs a fee and reveals nothing new.
+- **A new generation re-issues** every courier's current credential, with the same leaf (credential, holder key and
+  salt are kept), at a new index. The holder reads its new index from the GET; its secret and credential do not
+  change. A courier's older credentials are `superseded` there.
+- **Leaves are found by recomputing the root.** The registry inserts with `insertHash`, so `findPathForLeaf`, which
+  looks for a leaf hash, never finds them. `issuedLeafIndex` builds `pathForLeaf(i, leaf)` from the newest index
+  down and compares its root, folded with `transientHash` as the contract's `merkleTreePathRootNoLeafHash` folds it,
+  with the current root. A revoked leaf is therefore not found.
+- **Logs** name the credential id, the generation and the leaf index, never the principal, the holder key or the
+  salt. Metrics: `kinetix_seal_credential_requests_total{outcome}` and
+  `kinetix_seal_credential_issuances_total{outcome}`.
+- **Not handled yet:** a courier suspended by identity keeps the credentials it has. Identity publishes no standing
+  for couriers today (infra `docs/MERCHANT-SUSPENSION.md`, D1–D5 owed).
+
 ## Prisma
 
 - Prisma ORM 7.10.0 with `@prisma/adapter-pg`. The `prisma-client` generator writes TypeScript into
@@ -299,9 +349,10 @@ contracts/
 
 ## Not built yet
 
-- The gRPC server, the mesh certificate and the per-RPC allow list: these come with S1's first RPC in
-  `kinetix-contracts` (`seal.v1`).
-- The watcher on the indexer's contract actions, and the generations table.
-- The registry's deployment, issuance from matching's and review's facts, the verifier page and the holder's
-  page: the rest of S1. The contract and its tests exist; nothing deploys it yet.
-- The features: S1 credentials, S2 sealed-bid auctions, S3 anonymous reports.
+- Predicates: an admin approving a threshold, and seal writing it to the registry (`approvePredicate`), again in
+  every new generation (S1e).
+- The holder's page, in the courier app's WebView (SEAL-D8): the holder secret, `present` proved with the WASM
+  prover, the transaction handed to the sponsor (S1f). Its bundle decides SEAL-D9.
+- The public verifier page: a challenge, an approved predicate, and the challenge read back as answered (S1g).
+- A gRPC server of seal's own: nothing calls seal over the mesh yet.
+- S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions, S3 anonymous reports.

@@ -11,6 +11,7 @@ class FakeCourierFactStore implements CourierFactStorePort {
   ])
   readonly deliveries: CourierDelivery[] = []
   readonly reviews: ReviewRecord[] = []
+  readonly caughtUp = new Map<FeedStream, boolean>()
   failNext: Error | undefined
 
   async cursor(stream: FeedStream): Promise<LogCursor> {
@@ -23,16 +24,28 @@ class FakeCourierFactStore implements CourierFactStorePort {
     return cursor
   }
 
-  async recordDeliveries(_from: LogCursor, next: LogCursor, deliveries: CourierDelivery[]): Promise<void> {
+  async recordDeliveries(
+    _from: LogCursor,
+    next: LogCursor,
+    deliveries: CourierDelivery[],
+    caughtUp: boolean
+  ): Promise<void> {
     this.failIfAsked()
     this.cursors.set("deliveries", next)
     this.deliveries.push(...deliveries)
+    this.caughtUp.set("deliveries", caughtUp)
   }
 
-  async recordDriverReviews(_from: LogCursor, next: LogCursor, reviews: ReviewRecord[]): Promise<void> {
+  async recordDriverReviews(
+    _from: LogCursor,
+    next: LogCursor,
+    reviews: ReviewRecord[],
+    caughtUp: boolean
+  ): Promise<void> {
     this.failIfAsked()
     this.cursors.set("reviews", next)
     this.reviews.push(...reviews)
+    this.caughtUp.set("reviews", caughtUp)
   }
 
   private failIfAsked(): void {

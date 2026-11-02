@@ -6,6 +6,26 @@ import { routeTemplate } from "./route_template.ts"
 
 const routes = ["/health", "/health/ready", "/metrics"] as const
 
+function clientErrorOf(status: number): string {
+  if (status === 413) {
+    return "PAYLOAD_TOO_LARGE"
+  }
+
+  if (status === 415) {
+    return "JSON_REQUIRED"
+  }
+
+  return "INVALID_REQUEST"
+}
+
+function statusOf(error: unknown): number {
+  if (typeof error === "object" && error !== null && "statusCode" in error && typeof error.statusCode === "number") {
+    return error.statusCode
+  }
+
+  return 500
+}
+
 function buildHttpServer(dependencies: HttpServerDependencies): FastifyInstance {
   const server = Fastify({ logger: false, genReqId: (request) => requestIdOf(request.headers["x-request-id"]) })
 
@@ -26,6 +46,14 @@ function buildHttpServer(dependencies: HttpServerDependencies): FastifyInstance 
   })
 
   server.setErrorHandler(async (error, request, reply) => {
+    const status = statusOf(error)
+
+    if (status >= 400 && status < 500) {
+      return reply
+        .code(status)
+        .send({ error: clientErrorOf(status), message: "the request could not be read", traceId: request.id })
+    }
+
     dependencies.logger.error({ message: "an HTTP request failed", requestId: request.id }, error)
 
     return reply.code(500).send({ status: "error", traceId: request.id })

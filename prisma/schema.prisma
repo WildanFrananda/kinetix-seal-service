@@ -40,9 +40,10 @@ model RegistryGeneration {
 }
 
 model FeedCursor {
-  stream             String @id @db.VarChar(16)
-  throughTransaction BigInt @map("through_transaction")
-  throughSequence    BigInt @map("through_sequence")
+  stream             String    @id @db.VarChar(16)
+  throughTransaction BigInt    @map("through_transaction")
+  throughSequence    BigInt    @map("through_sequence")
+  caughtUpAt         DateTime? @map("caught_up_at") @db.Timestamptz(6)
 
   @@map("feed_cursors")
 }
@@ -64,4 +65,38 @@ model DriverReview {
 
   @@index([driverPrincipalId])
   @@map("driver_reviews")
+}
+
+model Credential {
+  id              String               @id @db.Uuid
+  principalId     String               @map("principal_id") @db.VarChar(128)
+  classId         String               @map("class_id") @db.Char(64)
+  attributes      BigInt[]
+  salt            String               @db.Char(64)
+  holderPublicKey String               @map("holder_public_key") @db.VarChar(80)
+  issueDay        Int                  @map("issue_day")
+  requestedAt     DateTime             @map("requested_at") @db.Timestamptz(6)
+  issuances       CredentialIssuance[]
+
+  @@unique([principalId, classId, issueDay])
+  @@index([principalId, classId, requestedAt])
+  @@map("credentials")
+}
+
+model CredentialIssuance {
+  credentialId String     @map("credential_id") @db.Uuid
+  generation   Int
+  status       String     @db.VarChar(16)
+  leaf         String?    @db.Char(64)
+  leafIndex    BigInt?    @map("leaf_index")
+  txId         String?    @map("tx_id") @db.VarChar(160)
+  attempts     Int
+  queuedAt     DateTime   @map("queued_at") @db.Timestamptz(6)
+  submittedAt  DateTime?  @map("submitted_at") @db.Timestamptz(6)
+  issuedAt     DateTime?  @map("issued_at") @db.Timestamptz(6)
+  credential   Credential @relation(fields: [credentialId], references: [id])
+
+  @@id([credentialId, generation])
+  @@index([generation, status, queuedAt])
+  @@map("credential_issuances")
 }

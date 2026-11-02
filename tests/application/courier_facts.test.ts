@@ -66,9 +66,11 @@ describe("the courier facts", () => {
 
     await facts.drain()
     assert.deepEqual(store.cursors.get("deliveries"), cursorAt(5, 1))
+    assert.equal(store.caughtUp.get("deliveries"), false)
 
     await facts.drain()
     assert.deepEqual(store.cursors.get("deliveries"), cursorAt(5, 2))
+    assert.equal(store.caughtUp.get("deliveries"), true)
   })
 
   it("refuses a page that breaks the feed's rules, and keeps the cursor", async () => {

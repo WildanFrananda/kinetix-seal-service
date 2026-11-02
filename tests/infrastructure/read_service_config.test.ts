@@ -27,7 +27,13 @@ const complete: NodeJS.ProcessEnv = {
   KINETIX_SEAL_SPONSOR_TIMEOUT_SECONDS: "5",
   KINETIX_SEAL_REGISTRY_CHECK_SECONDS: "600",
   KINETIX_SEAL_MIDNIGHT_STEP_SECONDS: "300",
-  KINETIX_SEAL_SHUTDOWN_GRACE_SECONDS: "25"
+  KINETIX_SEAL_SHUTDOWN_GRACE_SECONDS: "25",
+  IDENTITY_JWKS_URL: "http://kinetix-identity-service:5000/.well-known/jwks.json",
+  JWT_ISSUER: "https://identity.kinetix.local",
+  JWT_AUDIENCE: "kinetix",
+  KINETIX_SEAL_JWKS_TIMEOUT_SECONDS: "10",
+  KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS: "30",
+  KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS: "300"
 }
 
 describe("reading the service's configuration", () => {
@@ -39,6 +45,22 @@ describe("reading the service's configuration", () => {
     assert.deepEqual(config.mesh.trustDomains, ["kinetix.local", "prod.kinetix"])
     assert.equal(config.sponsor.url, "https://kinetix-seal-sponsor:8014")
     assert.ok(!("sponsorMnemonic" in config))
+    assert.deepEqual(config.identity, {
+      jwksUrl: "http://kinetix-identity-service:5000/.well-known/jwks.json",
+      issuer: "https://identity.kinetix.local",
+      audience: "kinetix",
+      timeoutSeconds: 10
+    })
+    assert.deepEqual(config.credentials, { issueSeconds: 30, factsMaxAgeSeconds: 300 })
+  })
+
+  it("needs identity's keys and the credential settings, with no default", () => {
+    const { IDENTITY_JWKS_URL: _keys, KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS: _age, ...rest } = complete
+
+    assert.throws(
+      () => readServiceConfig(rest),
+      /IDENTITY_JWKS_URL is required and has no default; KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS is required/
+    )
   })
 
   it("names every missing setting at once", () => {

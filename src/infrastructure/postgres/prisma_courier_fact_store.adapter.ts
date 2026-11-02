@@ -1,5 +1,8 @@
+import type { CourierFactReaderPort } from "../../application/ports/courier_fact_reader.port.ts"
 import type { CourierFactStorePort } from "../../application/ports/courier_fact_store.port.ts"
 import type { CourierDelivery } from "../../types/courier_delivery.type.ts"
+import type { CourierFactSummary } from "../../types/courier_fact_summary.type.ts"
+import type { FeedCatchUp } from "../../types/feed_catch_up.type.ts"
 import type { FeedStream } from "../../types/feed_stream.type.ts"
 import type { LogCursor } from "../../types/log_cursor.type.ts"
 import type { ReviewRecord } from "../../types/review_record.type.ts"
@@ -9,11 +12,16 @@ async function advance(
   transaction: Prisma.TransactionClient,
   stream: FeedStream,
   from: LogCursor,
-  next: LogCursor
+  next: LogCursor,
+  caughtUp: boolean
 ): Promise<void> {
   const moved = await transaction.feedCursor.updateMany({
     where: { stream, throughTransaction: from.transactionId, throughSequence: from.sequence },
-    data: { throughTransaction: next.transactionId, throughSequence: next.sequence }
+    data: {
+      throughTransaction: next.transactionId,
+      throughSequence: next.sequence,
+      ...(caughtUp ? { caughtUpAt: new Date() } : {})
+    }
   })
 
   if (moved.count !== 1) {
@@ -21,7 +29,11 @@ async function advance(
   }
 }
 
-class PrismaCourierFactStore implements CourierFactStorePort {
+function caughtUpOf(rows: { stream: string; caughtUpAt: Date | null }[], stream: FeedStream): Date | undefined {
+  return rows.find((row) => row.stream === stream)?.caughtUpAt ?? undefined
+}
+
+class PrismaCourierFactStore implements CourierFactStorePort, CourierFactReaderPort {
   private readonly prisma: PrismaClient
 
   constructor(prisma: PrismaClient) {
@@ -38,9 +50,14 @@ class PrismaCourierFactStore implements CourierFactStorePort {
     return { transactionId: row.throughTransaction, sequence: row.throughSequence }
   }
 
-  async recordDeliveries(from: LogCursor, next: LogCursor, deliveries: CourierDelivery[]): Promise<void> {
+  async recordDeliveries(
+    from: LogCursor,
+    next: LogCursor,
+    deliveries: CourierDelivery[],
+    caughtUp: boolean
+  ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
-      await advance(transaction, "deliveries", from, next)
+      await advance(transaction, "deliveries", from, next, caughtUp)
 
       if (deliveries.length > 0) {
         await transaction.courierDelivery.createMany({
@@ -55,9 +72,14 @@ class PrismaCourierFactStore implements CourierFactStorePort {
     })
   }
 
-  async recordDriverReviews(from: LogCursor, next: LogCursor, reviews: ReviewRecord[]): Promise<void> {
+  async recordDriverReviews(
+    from: LogCursor,
+    next: LogCursor,
+    reviews: ReviewRecord[],
+    caughtUp: boolean
+  ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
-      await advance(transaction, "reviews", from, next)
+      await advance(transaction, "reviews", from, next, caughtUp)
 
       if (reviews.length > 0) {
         await transaction.driverReview.createMany({
@@ -71,6 +93,34 @@ class PrismaCourierFactStore implements CourierFactStorePort {
         })
       }
     })
+  }
+
+  async summaryOf(principalId: string): Promise<CourierFactSummary> {
+    const [deliveries, reviews] = await Promise.all([
+      this.prisma.courierDelivery.aggregate({
+        where: { driverPrincipalId: principalId },
+        _count: { _all: true },
+        _min: { deliveredAt: true }
+      }),
+      this.prisma.driverReview.aggregate({
+        where: { driverPrincipalId: principalId },
+        _count: { _all: true },
+        _sum: { rating: true }
+      })
+    ])
+
+    return {
+      deliveries: deliveries._count._all,
+      firstDeliveredAt: deliveries._min.deliveredAt ?? undefined,
+      reviews: reviews._count._all,
+      ratingSum: reviews._sum.rating ?? 0
+    }
+  }
+
+  async catchUp(): Promise<FeedCatchUp> {
+    const rows = await this.prisma.feedCursor.findMany({ select: { stream: true, caughtUpAt: true } })
+
+    return { deliveries: caughtUpOf(rows, "deliveries"), reviews: caughtUpOf(rows, "reviews") }
   }
 }
 
