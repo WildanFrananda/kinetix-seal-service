@@ -111,6 +111,7 @@ describe("the credential registry contract", () => {
       registry.approvePredicate({ ...courierPredicate, minimums: [1n, 0n, 0n, 0n] }, newIssuer()),
       /not the issuer/
     )
+
     await assert.rejects(registry.approvePredicate(courierPredicate, issuer), /already approved/)
     assert.equal(registry.ledger().predicates.size(), 1n)
   })
@@ -168,6 +169,7 @@ describe("the credential registry contract", () => {
       attributes: [999n, 999n, 999n, issueDay],
       salt: randomBytes(32)
     }
+
     const holder = await issueTo(registry, issuer, credential)
 
     await assert.rejects(
@@ -305,6 +307,7 @@ describe("the credential registry contract", () => {
       registry.approvePredicate({ ...courierPredicate, minimums: [1n, 0n, 0n, 0n] }, issuer),
       /Pausable: paused/
     )
+
     await assert.rejects(registry.present(randomBytes(32), id, holder), /Pausable: paused/)
 
     await registry.unpause(issuer)

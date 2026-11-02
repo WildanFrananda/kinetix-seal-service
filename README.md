@@ -19,7 +19,7 @@ matching and review, and courier credentials: a courier asks, and seal issues a 
 | Midnight | wallet SDK 1.2.0, midnight-js 4.1.1, Preprod through Blockfrost |
 | tokens | jose 6.2.12, against identity's published keys |
 | metrics | prom-client 15.1.3 |
-| lint and format | Biome 2.5.15 |
+| lint and format | Biome 2.5.15, and `scripts/check_layout.ts` (`@babel/parser` 8.0.7) for blank lines |
 | tests | `node:test`, hand-written fakes, real Postgres |
 
 ## The gate
@@ -38,6 +38,9 @@ The image serves HTTP on `KINETIX_SEAL_HTTP_PORT`:
 - `/metrics`: Prometheus;
 - `POST /api/v1/seal/courier-credentials` and `GET /api/v1/seal/courier-credentials/{id}`: a courier's credentials,
   with identity's access token (the contract is in `CLAUDE.md`, "Courier credentials").
+- `GET /api/v1/seal/predicates` and `GET /api/v1/seal/predicates/{id}`: the approved predicates and their registry
+  rows, public; `POST /api/v1/seal/predicates` and `DELETE /api/v1/seal/predicates/{id}`: an admin approves or
+  withdraws one (`CLAUDE.md`, "Predicates").
 
 The migrator is the same image:
 

@@ -83,6 +83,7 @@ class RegistryGenerations {
 
       return "unknown" as const
     })
+
     const anchor = confirmedAnchor(this.previousAnchor, observed)
 
     this.previousAnchor = observed
@@ -104,6 +105,7 @@ class RegistryGenerations {
       anchorHeight: undefined,
       anchorHash: undefined
     })
+
     this.logger.info({
       message: "deploying a registry generation",
       fields: { generation, contract_address: prepared.contractAddress }

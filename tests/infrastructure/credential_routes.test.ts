@@ -166,12 +166,14 @@ describe("the courier credential routes", () => {
       headers: { authorization: courierToken, "content-type": "application/x-www-form-urlencoded" },
       payload: `holderPublicKey=${holderPublicKey}`
     })
+
     const text = await server.inject({
       method: "POST",
       url: route,
       headers: { authorization: courierToken, "content-type": "text/plain" },
       payload: holderPublicKey
     })
+
     const large = await requested(server, courierToken, { holderPublicKey: "1".repeat(2000) })
     const broken = await server.inject({
       method: "POST",

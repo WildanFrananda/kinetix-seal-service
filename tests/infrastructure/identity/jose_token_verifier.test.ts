@@ -48,9 +48,11 @@ describe("verifying identity's access tokens", () => {
       response.writeHead(keySetStatus, { "Content-Type": "application/json" })
       response.end(keySetStatus === 200 ? keys : "{}")
     })
+
     await new Promise<void>((resolve) => {
       server.listen(0, "127.0.0.1", resolve)
     })
+
     jwksUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/.well-known/jwks.json`
   })
 

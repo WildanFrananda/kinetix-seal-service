@@ -30,6 +30,7 @@ const deliveriesSince = unaryMethod(
   DeliveriesSinceRequestSchema,
   DeliveriesSinceResponseSchema
 )
+
 const reviewsSince = unaryMethod(
   "/review.v1.ReviewEvidenceService/ReviewsSince",
   ReviewsSinceRequestSchema,
@@ -121,6 +122,7 @@ describe("the fact feeds over the mesh", () => {
         hasMore: true
       })
     )
+
     const feed = new GrpcReviewFeed(server.address, seal, 5)
 
     stops.push(server.stop, () => {
@@ -133,6 +135,7 @@ describe("the fact feeds over the mesh", () => {
       page.records.map((record) => record.kind),
       ["driver", "product"]
     )
+
     assert.equal(page.hasMore, true)
   })
 

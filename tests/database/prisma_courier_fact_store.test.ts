@@ -53,6 +53,7 @@ describe("courier facts in Postgres", () => {
       store.recordDeliveries(cursorAt(0, 0), cursorAt(5, 2), [delivery(5, 2)], true),
       /the deliveries cursor moved under this page/
     )
+
     assert.equal(await prisma.courierDelivery.count(), 1)
     assert.deepEqual(await store.cursor("deliveries"), cursorAt(5, 1))
   })
@@ -106,6 +107,7 @@ describe("courier facts in Postgres", () => {
       [{ ...delivery(5, 1), deliveredAt: new Date("2026-09-01T10:00:00Z") }, delivery(5, 2), delivery(5, 3, "drv_2")],
       true
     )
+
     await store.recordDriverReviews(
       cursorAt(0, 0),
       cursorAt(7, 3),

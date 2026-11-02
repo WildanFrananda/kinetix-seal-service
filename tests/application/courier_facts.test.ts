@@ -53,6 +53,7 @@ describe("the courier facts", () => {
       store.reviews.map((kept) => kept.reviewId),
       ["rev-7-2"]
     )
+
     assert.deepEqual(store.cursors.get("reviews"), cursorAt(7, 3))
   })
 
@@ -111,6 +112,7 @@ describe("the courier facts", () => {
       { stream: "deliveries", kind: "refused" },
       { stream: "reviews", kind: "store" }
     ])
+
     assert.deepEqual(store.cursors.get("reviews"), cursorAt(0, 0))
   })
 

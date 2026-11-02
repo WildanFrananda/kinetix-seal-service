@@ -10,6 +10,7 @@ async function payAndSubmit(wallet: WalletFacade, keys: WalletKeys, transaction:
     { shieldedSecretKeys: keys.shieldedSecretKeys, dustSecretKey: keys.dustSecretKey },
     { ttl: ttlOneHour() }
   )
+
   const signed = await wallet.signRecipe(recipe, (payload) => keys.unshieldedKeystore.signData(payload))
 
   return wallet.submitTransaction(await wallet.finalizeRecipe(signed))

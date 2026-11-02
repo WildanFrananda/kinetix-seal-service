@@ -40,6 +40,7 @@ describe("a fact feed page", () => {
       feedPageViolation(at(5, 1), 3, { records: [record(5, 1)], next: at(5, 1), hasMore: false }) ?? "",
       /do not increase/
     )
+
     assert.match(
       feedPageViolation(at(4, 0), 3, { records: [record(5, 2), record(5, 1)], next: at(5, 1), hasMore: false }) ?? "",
       /do not increase/

@@ -1,4 +1,5 @@
 import type { CredentialStorePort } from "../../application/ports/credential_store.port.ts"
+import { bytesOf, hexOf } from "../../domain/hex.ts"
 import type { CredentialRecord } from "../../types/credential_record.type.ts"
 import type { IssuanceRecord } from "../../types/issuance_record.type.ts"
 import type { IssuanceStatus } from "../../types/issuance_status.type.ts"
@@ -9,14 +10,6 @@ type CredentialRow = Prisma.CredentialGetPayload<Record<string, never>>
 type IssuanceRow = Prisma.CredentialIssuanceGetPayload<Record<string, never>>
 
 const statuses: readonly IssuanceStatus[] = ["pending", "uncertain", "issued"]
-
-function hexOf(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("hex")
-}
-
-function bytesOf(hex: string): Uint8Array {
-  return new Uint8Array(Buffer.from(hex, "hex"))
-}
 
 function credentialOf(row: CredentialRow): CredentialRecord {
   return {

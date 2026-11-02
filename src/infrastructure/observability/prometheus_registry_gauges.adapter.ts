@@ -15,6 +15,7 @@ class PrometheusRegistryGauges implements RegistryGaugesPort {
       help: "The credential registry generation in use, 0 before the first is deployed",
       registers: [registry]
     })
+
     this.deploys = new Counter({
       name: "kinetix_seal_registry_deploys_total",
       help: "Credential registry deployments, by outcome",

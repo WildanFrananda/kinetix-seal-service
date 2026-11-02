@@ -21,15 +21,18 @@ before(async () => {
     status: 200,
     body: await fixture("block_at_height_0.json")
   })
+
   answers.set("{ block { hash height } }", { status: 200, body: await fixture("tip.json") })
   answers.set("{ block(offset: { height: 999999999 }) { hash height } }", {
     status: 200,
     body: await fixture("block_beyond_tip.json")
   })
+
   answers.set("{ block(offset: { height: 7 }) { hash height } }", {
     status: 200,
     body: await fixture("refused_query.json")
   })
+
   answers.set("{ block(offset: { height: 8 }) { hash height } }", { status: 503, body: "" })
 
   server = createServer((request, response) => {
@@ -38,6 +41,7 @@ before(async () => {
     request.on("data", (chunk) => {
       body += chunk
     })
+
     request.on("end", () => {
       const query = (JSON.parse(body) as { query: string }).query
       const answer = answers.get(query) ?? { status: 400, body: "" }
@@ -50,6 +54,7 @@ before(async () => {
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", resolve)
   })
+
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v0`
 })
 

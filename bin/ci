@@ -9,6 +9,7 @@ npm ci --ignore-scripts
 npx prisma generate
 sh bin/contracts
 npx biome ci --colors=off .
+node scripts/check_layout.ts
 npx tsc -p tsconfig.json
 
 export KINETIX_SEAL_DATABASE_URL="$KINETIX_SEAL_TEST_DATABASE_URL"
