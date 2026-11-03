@@ -12,21 +12,24 @@ import type { LoggerPort } from "./application/ports/logger.port.ts"
 import PredicateCatalogue from "./application/predicate_catalogue.service.ts"
 import PredicateKeeper from "./application/predicate_keeper.service.ts"
 import PresentationRelay from "./application/presentation_relay.service.ts"
+import PresentationStatuses from "./application/presentation_statuses.service.ts"
 import Readiness from "./application/readiness.service.ts"
 import RegistryGenerations from "./application/registry_generations.service.ts"
 import RegistrySnapshots from "./application/registry_snapshots.service.ts"
 import RemoteSponsorStatus from "./application/remote_sponsor_status.service.ts"
+import { presentationStatusMaxAgeSeconds } from "./domain/presentation_status_age.ts"
 import { registrySnapshotMaxAgeSeconds } from "./domain/registry_snapshot_age.ts"
 import { readServiceConfig } from "./infrastructure/config/read_service_config.ts"
 import GrpcDeliveryFeed from "./infrastructure/grpc/grpc_delivery_feed.adapter.ts"
 import GrpcReviewFeed from "./infrastructure/grpc/grpc_review_feed.adapter.ts"
+import BundleAssets from "./infrastructure/http/bundle_assets.ts"
 import { registerCredentialRoutes } from "./infrastructure/http/credential_routes.ts"
-import HolderAssets from "./infrastructure/http/holder_assets.ts"
 import { registerHolderRoutes } from "./infrastructure/http/holder_routes.ts"
 import { buildHttpServer } from "./infrastructure/http/http_server.ts"
 import { registerPredicateRoutes } from "./infrastructure/http/predicate_routes.ts"
 import { registerPresentationRoutes } from "./infrastructure/http/presentation_routes.ts"
 import { registerRegistrySnapshotRoutes } from "./infrastructure/http/registry_snapshot_routes.ts"
+import { registerVerifierRoutes } from "./infrastructure/http/verifier_routes.ts"
 import JoseTokenVerifier from "./infrastructure/identity/jose_token_verifier.adapter.ts"
 import { loadMeshIdentity } from "./infrastructure/mesh/mesh_identity.ts"
 import { withProjectId } from "./infrastructure/midnight/blockfrost_url.ts"
@@ -199,12 +202,21 @@ registerPresentationRoutes(server, {
     generations: generationStore,
     metrics: new PrometheusPresentationMetrics(registry)
   }),
+  statuses: new PresentationStatuses(registryChain, generationStore, presentationStatusMaxAgeSeconds, now),
   logger,
   metrics
 })
 
+registerVerifierRoutes(server, {
+  assets: BundleAssets.load(fileURLToPath(new URL("../verifier-bundle/", import.meta.url)), [
+    "verifier.js",
+    "verifier.css"
+  ]),
+  metrics
+})
+
 registerHolderRoutes(server, {
-  assets: HolderAssets.load(fileURLToPath(new URL("../holder-bundle/", import.meta.url))),
+  assets: BundleAssets.load(fileURLToPath(new URL("../holder-bundle/", import.meta.url)), ["index.html", "holder.js"]),
   metrics
 })
 

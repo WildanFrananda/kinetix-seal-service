@@ -1,13 +1,13 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { licenceRefusals } from "../../scripts/holder_licences.ts"
+import { licenceRefusals } from "../../scripts/bundle_licences.ts"
 
 function bundled(name: string, licence: string | undefined) {
   return { name, version: "1.0.0", licence, directory: `node_modules/${name}` }
 }
 
-describe("the holder bundle's licence gate", () => {
+describe("the browser bundles' licence gate", () => {
   it("lets through permissive licences and the Midnight WASM packages whose source is Apache-2.0", () => {
     assert.deepEqual(
       licenceRefusals([

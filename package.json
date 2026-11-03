@@ -46,6 +46,8 @@
     "@types/node": "26.6.5",
     "@types/pg": "8.23.1",
     "esbuild": "0.28.2",
+    "jsqr": "1.4.0",
+    "qrcode-generator": "2.0.4",
     "typescript": "7.0.2"
   },
   "overrides": {

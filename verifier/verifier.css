@@ -1,0 +1,104 @@
+:root {
+  color-scheme: light dark;
+  --ink: #1d1d1f;
+  --paper: #ffffff;
+  --muted: #5f6368;
+  --line: #d0d4d9;
+  --ok: #1e6b3a;
+  --no: #a1271b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #ececec;
+    --paper: #16181b;
+    --muted: #a3a8ae;
+    --line: #3a3f45;
+    --ok: #6fcf8f;
+    --no: #f08a7e;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font:
+    16px / 1.5 system-ui,
+    sans-serif;
+}
+
+main {
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+}
+
+.choice {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.minimums {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  margin: 0.25rem 0.5rem 0.25rem 0;
+}
+
+.action {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--ink);
+}
+
+.code {
+  display: block;
+  width: min(100%, 22rem);
+  margin: 1rem 0;
+  image-rendering: pixelated;
+}
+
+.camera {
+  width: 100%;
+  border-radius: 6px;
+  background: #000;
+}
+
+.hint {
+  color: var(--muted);
+}
+
+.verified {
+  color: var(--ok);
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+.refused {
+  color: var(--no);
+  font-weight: 600;
+}

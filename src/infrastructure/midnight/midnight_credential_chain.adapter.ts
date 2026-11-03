@@ -10,7 +10,9 @@ import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/ledger"
 import { type Ledger, ledger, pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import type { CredentialChainPort } from "../../application/ports/credential_chain.port.ts"
 import type { PredicateChainPort } from "../../application/ports/predicate_chain.port.ts"
+import type { PresentationLedgerPort } from "../../application/ports/presentation_ledger.port.ts"
 import type { RegistrySnapshotSourcePort } from "../../application/ports/registry_snapshot_source.port.ts"
+import { hexOf } from "../../domain/hex.ts"
 import type { CredentialRecord } from "../../types/credential_record.type.ts"
 import type { MidnightCredentialChainDependencies } from "../../types/midnight_credential_chain_dependencies.type.ts"
 import type { PlacedPredicate } from "../../types/placed_predicate.type.ts"
@@ -28,7 +30,9 @@ import { submitSealTransaction } from "./submit_seal_transaction.ts"
 
 const compiledContract = compileCredentialRegistry()
 
-class MidnightCredentialChain implements CredentialChainPort, PredicateChainPort, RegistrySnapshotSourcePort {
+class MidnightCredentialChain
+  implements CredentialChainPort, PredicateChainPort, PresentationLedgerPort, RegistrySnapshotSourcePort
+{
   private readonly dependencies: MidnightCredentialChainDependencies
 
   constructor(dependencies: MidnightCredentialChainDependencies) {
@@ -61,6 +65,16 @@ class MidnightCredentialChain implements CredentialChainPort, PredicateChainPort
 
   async withdraw(contractAddress: string, id: Uint8Array): Promise<RegistryReceipt> {
     return this.call(contractAddress, "withdrawPredicate", [id], "a predicate withdrawal")
+  }
+
+  async presentations(contractAddress: string): Promise<Map<string, string>> {
+    const answers = new Map<string, string>()
+
+    for (const [challenge, predicateId] of (await this.registryLedger(contractAddress)).presentations) {
+      answers.set(hexOf(challenge), hexOf(predicateId))
+    }
+
+    return answers
   }
 
   async stateOf(contractAddress: string): Promise<RegistryStateBytes> {
