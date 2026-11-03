@@ -1,5 +1,5 @@
 import type { TLSSocket } from "node:tls"
-import Fastify, { type FastifyInstance } from "fastify"
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify"
 
 import SponsorUnavailable from "../../domain/sponsor_unavailable.ts"
 import type { SponsorApiDependencies } from "../../types/sponsor_api_dependencies.type.ts"
@@ -11,6 +11,39 @@ const maximumTransactionBytes = 1_048_576
 
 function buildSponsorApi(dependencies: SponsorApiDependencies): FastifyInstance {
   const { identity, state, payer, logger } = dependencies
+
+  async function spend(
+    body: unknown,
+    reply: FastifyReply,
+    send: (transaction: Uint8Array) => Promise<string>
+  ): Promise<FastifyReply | { txId: string }> {
+    const hex = (body as { transaction?: unknown } | undefined)?.transaction
+
+    if (typeof hex !== "string" || hex.length === 0 || hex.length % 2 !== 0 || !/^[0-9a-f]+$/.test(hex)) {
+      return reply.code(400).send({ error: "invalid_transaction", message: "transaction must be lowercase hex" })
+    }
+
+    if (hex.length / 2 > maximumTransactionBytes) {
+      return reply.code(413).send({ error: "transaction_too_large", message: "a transaction is at most 1 MiB" })
+    }
+
+    const current = await state.state()
+
+    if (current.condition === "syncing") {
+      return reply.code(503).send({ error: "sponsor_syncing", message: "the sponsor wallet is still syncing" })
+    }
+
+    try {
+      return { txId: await send(Buffer.from(hex, "hex")) }
+    } catch (error) {
+      if (error instanceof SponsorUnavailable) {
+        return reply.code(503).send({ error: "sponsor_unavailable", message: error.message })
+      }
+
+      throw error
+    }
+  }
+
   const server = Fastify({
     logger: false,
     bodyLimit: maximumTransactionBytes * 2 + 1024,
@@ -49,32 +82,15 @@ function buildSponsorApi(dependencies: SponsorApiDependencies): FastifyInstance 
   })
 
   server.post("/v1/transactions/pay", async (request, reply) => {
-    const body = request.body as { transaction?: unknown } | undefined
-    const hex = body?.transaction
+    return spend(request.body, reply, function payUnbound(transaction: Uint8Array): Promise<string> {
+      return payer.pay(transaction)
+    })
+  })
 
-    if (typeof hex !== "string" || hex.length === 0 || hex.length % 2 !== 0 || !/^[0-9a-f]+$/.test(hex)) {
-      return reply.code(400).send({ error: "invalid_transaction", message: "transaction must be lowercase hex" })
-    }
-
-    if (hex.length / 2 > maximumTransactionBytes) {
-      return reply.code(413).send({ error: "transaction_too_large", message: "a transaction is at most 1 MiB" })
-    }
-
-    const current = await state.state()
-
-    if (current.condition === "syncing") {
-      return reply.code(503).send({ error: "sponsor_syncing", message: "the sponsor wallet is still syncing" })
-    }
-
-    try {
-      return { txId: await payer.pay(Buffer.from(hex, "hex")) }
-    } catch (error) {
-      if (error instanceof SponsorUnavailable) {
-        return reply.code(503).send({ error: "sponsor_unavailable", message: error.message })
-      }
-
-      throw error
-    }
+  server.post("/v1/transactions/sponsor", async (request, reply) => {
+    return spend(request.body, reply, function sponsorBound(transaction: Uint8Array): Promise<string> {
+      return payer.sponsor(transaction)
+    })
   })
 
   return server

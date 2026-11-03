@@ -29,7 +29,9 @@ COPY bin/contracts ./bin/contracts
 COPY contracts ./contracts
 
 RUN --mount=type=cache,id=kinetix-seal-zk-params,target=/zk-params \
-    MIDNIGHT_PP=/zk-params sh bin/contracts
+    MIDNIGHT_PP=/zk-params sh bin/contracts \
+ && mkdir -p /app/zk-params \
+ && cp /zk-params/bls_midnight_2p* /app/zk-params/
 
 FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS build
 
@@ -47,12 +49,17 @@ RUN npm ci --ignore-scripts
 COPY tsconfig.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY --from=contracts /app/managed ./managed
+COPY --from=contracts /app/zk-params /zk-params
 COPY src ./src
+COPY holder ./holder
+COPY scripts ./scripts
 RUN npx prisma generate \
  && npx tsc -p tsconfig.json \
+ && MIDNIGHT_PP=/zk-params node scripts/build_holder.ts \
  && npx prisma --version \
  && test -x "$(ls node_modules/@prisma/engines/schema-engine-* | head -n 1)" \
- && test -f dist/src/main.js
+ && test -f dist/src/main.js \
+ && test -f dist/holder-bundle/current.json
 
 FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
 

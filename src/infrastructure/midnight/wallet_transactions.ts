@@ -1,3 +1,4 @@
+import type { Binding, Proof, SignatureEnabled, Transaction } from "@midnight-ntwrk/midnight-js-protocol/ledger"
 import type { UnboundTransaction } from "@midnight-ntwrk/midnight-js-types"
 import { ttlOneHour } from "@midnight-ntwrk/midnight-js-utils"
 import type { WalletFacade } from "@midnightntwrk/wallet-sdk"
@@ -16,4 +17,20 @@ async function payAndSubmit(wallet: WalletFacade, keys: WalletKeys, transaction:
   return wallet.submitTransaction(await wallet.finalizeRecipe(signed))
 }
 
-export { payAndSubmit }
+async function sponsorAndSubmit(
+  wallet: WalletFacade,
+  keys: WalletKeys,
+  transaction: Transaction<SignatureEnabled, Proof, Binding>
+): Promise<string> {
+  const recipe = await wallet.balanceFinalizedTransaction(
+    transaction,
+    { shieldedSecretKeys: keys.shieldedSecretKeys, dustSecretKey: keys.dustSecretKey },
+    { ttl: ttlOneHour(), tokenKindsToBalance: ["dust"] }
+  )
+
+  const signed = await wallet.signRecipe(recipe, (payload) => keys.unshieldedKeystore.signData(payload))
+
+  return wallet.submitTransaction(await wallet.finalizeRecipe(signed))
+}
+
+export { payAndSubmit, sponsorAndSubmit }

@@ -87,6 +87,17 @@ describe("the link between seal and its sponsor", () => {
     assert.deepEqual([...(sponsor.payer.paid[0] ?? [])], [...transaction])
   })
 
+  it("hands a holder's bound transaction to the sponsor for DUST only, byte for byte", async () => {
+    const sponsor = await sponsorAs("seal")
+    const transaction = Uint8Array.from([9, 8, 7, 6])
+
+    const txId = await clientAs("seal", sponsor.url).sponsor(transaction)
+
+    assert.equal(txId, "00sp1")
+    assert.deepEqual([...(sponsor.payer.sponsored[0] ?? [])], [...transaction])
+    assert.equal(sponsor.payer.paid.length, 0)
+  })
+
   it("refuses to pay while the sponsor's wallet syncs", async () => {
     const sponsor = await sponsorAs("seal")
 

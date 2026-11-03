@@ -15,6 +15,14 @@ class StartingTransactionPayer implements TransactionPayerPort {
 
     return this.delegate.pay(unboundTransaction)
   }
+
+  async sponsor(boundTransaction: Uint8Array): Promise<string> {
+    if (this.delegate === undefined) {
+      throw new SponsorUnavailable("the sponsor wallet has not started")
+    }
+
+    return this.delegate.sponsor(boundTransaction)
+  }
 }
 
 export default StartingTransactionPayer

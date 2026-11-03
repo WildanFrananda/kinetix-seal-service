@@ -25,6 +25,7 @@ import {
   credentialRegistryDirectory
 } from "../../../src/infrastructure/midnight/credential_registry_contract.ts"
 import type { CredentialRegistryPrivateState } from "../../../src/types/credential_registry_private_state.type.ts"
+import type { RegistrySnapshotWire } from "../../../src/types/registry_snapshot_wire.type.ts"
 
 type Registry = Contract<CredentialRegistryPrivateState>
 type RegistryCircuit = CompactContract.ProvableCircuitId<Registry>
@@ -61,6 +62,22 @@ class InMemoryCredentialRegistry {
 
   ledger(): Ledger {
     return ledger(this.state.data)
+  }
+
+  contractAddress(): string {
+    return this.address
+  }
+
+  snapshotWire(generation: number): RegistrySnapshotWire {
+    return {
+      generation,
+      networkId: "undeployed",
+      contractAddress: this.address,
+      contractState: Buffer.from(this.state.serialize()).toString("hex"),
+      zswapChainState: Buffer.from(new ZswapChainState().serialize()).toString("hex"),
+      ledgerParameters: Buffer.from(LedgerParameters.initialParameters().serialize()).toString("hex"),
+      readAt: new Date().toISOString()
+    }
   }
 
   async issue(leaf: Uint8Array, as: CredentialRegistryPrivateState): Promise<void> {
