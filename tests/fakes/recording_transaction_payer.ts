@@ -2,6 +2,7 @@ import type { TransactionPayerPort } from "../../src/application/ports/transacti
 
 class RecordingTransactionPayer implements TransactionPayerPort {
   readonly paid: Uint8Array[] = []
+  readonly sponsored: Uint8Array[] = []
   failure: Error | undefined
 
   async pay(unboundTransaction: Uint8Array): Promise<string> {
@@ -12,6 +13,16 @@ class RecordingTransactionPayer implements TransactionPayerPort {
     this.paid.push(unboundTransaction)
 
     return `00tx${this.paid.length}`
+  }
+
+  async sponsor(boundTransaction: Uint8Array): Promise<string> {
+    if (this.failure !== undefined) {
+      throw this.failure
+    }
+
+    this.sponsored.push(boundTransaction)
+
+    return `00sp${this.sponsored.length}`
   }
 }
 

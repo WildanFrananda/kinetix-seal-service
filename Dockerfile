@@ -48,11 +48,16 @@ COPY tsconfig.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY --from=contracts /app/managed ./managed
 COPY src ./src
-RUN npx prisma generate \
+COPY holder ./holder
+COPY scripts ./scripts
+RUN --mount=type=cache,id=kinetix-seal-zk-params,target=/zk-params \
+    npx prisma generate \
  && npx tsc -p tsconfig.json \
+ && MIDNIGHT_PP=/zk-params node scripts/build_holder.ts \
  && npx prisma --version \
  && test -x "$(ls node_modules/@prisma/engines/schema-engine-* | head -n 1)" \
- && test -f dist/src/main.js
+ && test -f dist/src/main.js \
+ && test -f dist/holder-bundle/current.json
 
 FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
 

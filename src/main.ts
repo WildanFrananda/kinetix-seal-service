@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url"
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider"
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider"
 import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
@@ -10,21 +11,29 @@ import CredentialIssuer from "./application/credential_issuer.service.ts"
 import type { LoggerPort } from "./application/ports/logger.port.ts"
 import PredicateCatalogue from "./application/predicate_catalogue.service.ts"
 import PredicateKeeper from "./application/predicate_keeper.service.ts"
+import PresentationRelay from "./application/presentation_relay.service.ts"
 import Readiness from "./application/readiness.service.ts"
 import RegistryGenerations from "./application/registry_generations.service.ts"
+import RegistrySnapshots from "./application/registry_snapshots.service.ts"
 import RemoteSponsorStatus from "./application/remote_sponsor_status.service.ts"
+import { registrySnapshotMaxAgeSeconds } from "./domain/registry_snapshot_age.ts"
 import { readServiceConfig } from "./infrastructure/config/read_service_config.ts"
 import GrpcDeliveryFeed from "./infrastructure/grpc/grpc_delivery_feed.adapter.ts"
 import GrpcReviewFeed from "./infrastructure/grpc/grpc_review_feed.adapter.ts"
 import { registerCredentialRoutes } from "./infrastructure/http/credential_routes.ts"
+import HolderAssets from "./infrastructure/http/holder_assets.ts"
+import { registerHolderRoutes } from "./infrastructure/http/holder_routes.ts"
 import { buildHttpServer } from "./infrastructure/http/http_server.ts"
 import { registerPredicateRoutes } from "./infrastructure/http/predicate_routes.ts"
+import { registerPresentationRoutes } from "./infrastructure/http/presentation_routes.ts"
+import { registerRegistrySnapshotRoutes } from "./infrastructure/http/registry_snapshot_routes.ts"
 import JoseTokenVerifier from "./infrastructure/identity/jose_token_verifier.adapter.ts"
 import { loadMeshIdentity } from "./infrastructure/mesh/mesh_identity.ts"
 import { withProjectId } from "./infrastructure/midnight/blockfrost_url.ts"
 import { contractBuildDigest } from "./infrastructure/midnight/contract_build_digest.ts"
 import { credentialRegistryDirectory } from "./infrastructure/midnight/credential_registry_contract.ts"
 import IndexerBlocks from "./infrastructure/midnight/indexer_blocks.ts"
+import LedgerPresentationInspector from "./infrastructure/midnight/ledger_presentation_inspector.ts"
 import MidnightCredentialChain from "./infrastructure/midnight/midnight_credential_chain.adapter.ts"
 import MidnightRegistryChain from "./infrastructure/midnight/midnight_registry_chain.adapter.ts"
 import { serviceSecrets } from "./infrastructure/midnight/seal_secrets.ts"
@@ -33,6 +42,7 @@ import JsonLogger from "./infrastructure/observability/json_logger.ts"
 import PrometheusCredentialMetrics from "./infrastructure/observability/prometheus_credential_metrics.adapter.ts"
 import PrometheusFeedMetrics from "./infrastructure/observability/prometheus_feed_metrics.adapter.ts"
 import PrometheusPredicateMetrics from "./infrastructure/observability/prometheus_predicate_metrics.adapter.ts"
+import PrometheusPresentationMetrics from "./infrastructure/observability/prometheus_presentation_metrics.adapter.ts"
 import PrometheusRegistryGauges from "./infrastructure/observability/prometheus_registry_gauges.adapter.ts"
 import { redactOutput } from "./infrastructure/observability/redacting_output.ts"
 import { createPrismaClient } from "./infrastructure/postgres/prisma_client.ts"
@@ -174,6 +184,28 @@ registerPredicateRoutes(server, {
   logger,
   metrics,
   clock: now
+})
+
+registerRegistrySnapshotRoutes(server, {
+  snapshots: new RegistrySnapshots(registryChain, generationStore, registrySnapshotMaxAgeSeconds, now),
+  logger,
+  metrics
+})
+
+registerPresentationRoutes(server, {
+  relay: new PresentationRelay({
+    inspector: new LedgerPresentationInspector(),
+    payer: sponsor,
+    generations: generationStore,
+    metrics: new PrometheusPresentationMetrics(registry)
+  }),
+  logger,
+  metrics
+})
+
+registerHolderRoutes(server, {
+  assets: HolderAssets.load(fileURLToPath(new URL("../holder-bundle/", import.meta.url))),
+  metrics
 })
 
 const stops: Array<() => void> = []

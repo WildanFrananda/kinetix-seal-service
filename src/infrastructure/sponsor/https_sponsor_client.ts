@@ -39,10 +39,22 @@ class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort
   }
 
   async pay(unboundTransaction: Uint8Array): Promise<string> {
+    return this.spend("/v1/transactions/pay", unboundTransaction)
+  }
+
+  async sponsor(boundTransaction: Uint8Array): Promise<string> {
+    return this.spend("/v1/transactions/sponsor", boundTransaction)
+  }
+
+  close(): void {
+    this.agent.destroy()
+  }
+
+  private async spend(path: string, transaction: Uint8Array): Promise<string> {
     const body = await this.send(
       "POST",
-      "/v1/transactions/pay",
-      { transaction: Buffer.from(unboundTransaction).toString("hex") },
+      path,
+      { transaction: Buffer.from(transaction).toString("hex") },
       this.payTimeoutSeconds
     )
 
@@ -53,10 +65,6 @@ class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort
     }
 
     return txId
-  }
-
-  close(): void {
-    this.agent.destroy()
   }
 
   private send(method: string, path: string, body: unknown, timeoutSeconds: number): Promise<unknown> {

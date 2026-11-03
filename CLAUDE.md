@@ -9,9 +9,11 @@ Today it runs, for real:
 - the credential registry's generations on Preprod (S1a);
 - the courier facts, read from matching and review over the mesh (S1b);
 - courier credentials: a courier asks, seal issues a snapshot of their facts into the registry (S1d);
-- predicates: an admin approves the minimums a holder may be asked to prove, seal keeps them in the registry (S1e).
+- predicates: an admin approves the minimums a holder may be asked to prove, seal keeps them in the registry (S1e);
+- the holder runtime a phone proves with, the registry snapshot it proves against, and the relay a verifier hands
+  a presentation to (S1f, SEAL-D9 and D18).
 
-What S1 still lacks is the holder's page and the verifier's page ("Not built yet").
+What S1 still lacks is the courier app's screens and the verifier's page ("Not built yet").
 
 ## Everything runs in Docker
 
@@ -111,6 +113,9 @@ test. It refuses to start without the toolchain's database: a skipped database t
   leaf names `kinetix-seal-service`, not the sponsor's host, so the link checks the chain and the SPIFFE ID, not
   the hostname. The API is `/v1`, kept backward compatible because the two run different builds:
   - `GET /v1/state`: the condition and the snapshot, the DUST balance in SPECK as a string;
+  - `POST /v1/transactions/sponsor` (S1f): `{ "transaction": hex }`, a holder's proven and bound transaction
+    (`"binding"`); the sponsor balances it with DUST only and submits it, in the same queue as `pay`. An older
+    sponsor answers 404, which the service's relay reports as `SPONSOR_UNAVAILABLE`;
   - `POST /v1/transactions/pay`: `{ "transaction": hex }`, a proven and unbound transaction (the ledger's
     `"signature"`, `"proof"`, `"pre-binding"`); the sponsor adds DUST, signs, finalizes, submits, and answers
     `{ "txId" }`. Spends run one at a time. Confirmation is the caller's, through the indexer. While the wallet
@@ -352,6 +357,49 @@ finding 1); a verifier cannot narrow a holder's values down with arbitrary thres
 - The registry adapter (`MidnightCredentialChain`) serves both the issuer and the keeper; each circuit call reads
   the registry's state, builds the call, and goes through the same prove, pay and confirm path.
 
+### The holder runtime and the relay (S1f)
+
+SEAL-D9: no GPL code ships to a holder. SEAL-D18: the verifier, not the holder's phone, hands a presentation to
+seal, so at presentation time seal sees the verifier's address and never the holder's.
+
+- **The runtime is `holder/`**, TypeScript for a browser: the courier app's hidden WebView loads its page and calls
+  `sealHolder.prepare(id)`, `sealHolder.holderPublicKey(id, secretHex)` and `sealHolder.present(id, requestJson)`;
+  every answer is a JSON string posted to the app's `SealHolderBridge` channel as `{ id, ok, … }`, never thrown.
+  `present` takes the registry snapshot, the holder secret, the credential as seal's GET returned it, the leaf
+  index, the verifier's challenge and a predicate row id, builds the call with midnight-js, proves it with the WASM
+  prover and answers the bound transaction in hex. The network id comes with the snapshot, because it is written
+  into the transaction. The proof runs on the page's thread: the WebView is hidden and its screens are Flutter's,
+  so nothing waits on it.
+- **The bundle** (`scripts/build_holder.ts`, esbuild, run by `bin/ci` and the image build) is
+  `dist/holder-bundle/<sha256 of its files>/`: `index.html`, `holder.js`, the three WASM files, `present`'s
+  prover key, verifier key and IR, and `bls_midnight_2p12` (from `MIDNIGHT_PP`), about 7 MB compressed. Two esbuild
+  plugins do what a WASM-aware bundler would: `wasm-bindgen-loader` gives each Midnight WASM package a loader that
+  streams its `.wasm` and passes the snippet modules its imports name, and `hex-only-address-format` replaces
+  `@midnight-ntwrk/wallet-sdk-address-format`, the only way GPL code (`@subsquid/*`) entered, with a module that
+  throws on bech32: midnight-js returns hex keys before reaching it, and the holder passes hex only. The build
+  refuses any GPL, AGPL, LGPL, SSPL, BSL, BUSL or FSL package, or one without a licence, except the three WASM
+  packages, Apache-2.0 at `midnightntwrk/midnight-ledger`; `THIRD_PARTY_NOTICES.txt` carries every licence.
+  `tests/holder/holder_bundle.test.ts` runs the built bundle itself in Node and proves a presentation with it.
+- **Seal serves it** at `GET /api/v1/seal/holder` (the current build, `no-cache`) and
+  `GET /api/v1/seal/holder/{digest}/{file}` (immutable for a year; the page with a CSP that allows only its own
+  scripts, `wasm-unsafe-eval` and its own origin). The service refuses to start without a build.
+- **The registry snapshot**, `GET /api/v1/seal/registry/snapshot`, is the active registry's contract state, Zswap
+  state and ledger parameters in hex, read through the indexer at most once a minute and cacheable for a minute;
+  `503 REGISTRY_UNAVAILABLE` while none can be read. The app fetches it on its own schedule, never while
+  presenting: a proof against an older root still lands, because the contract keeps the root history until a
+  revocation resets it.
+- **The relay**, `POST /api/v1/seal/presentations` with `{ "transaction": "<hex>" }`, takes no token: anyone may
+  relay, and a verifier with its own server relays the same way. Before the sponsor spends, the transaction must
+  deserialize as proven and bound, hold exactly one call, `present`, to the active registry, and move no coins
+  (`presentation_shape.ts`); otherwise `422 NOT_A_PRESENTATION`. The sponsor's new
+  `POST /v1/transactions/sponsor` balances it with DUST only (`balanceFinalizedTransaction`, as in the official
+  sponsoring guide), in the same queue as seal's own spends, so it can neither change the call nor see a secret.
+  `202 { txId }`; `503 SPONSOR_UNAVAILABLE` or `REGISTRY_UNAVAILABLE` with `Retry-After: 30`. Neither the route
+  nor its logs record an address; the gateway limits it to 20 a minute per address.
+- **Not checked before paying:** whether the challenge was already answered or the predicate row is still placed;
+  a transaction that fails on chain costs its fee. The verifier page reads both first (S1g).
+- Metrics: `kinetix_seal_presentations_relayed_total{outcome}`.
+
 ## Prisma
 
 - Prisma ORM 7.10.0 with `@prisma/adapter-pg`. The `prisma-client` generator writes TypeScript into
@@ -398,8 +446,9 @@ finding 1); a verifier cannot narrow a holder's values down with arbitrary thres
 ## Not built yet
 
 - The backoffice screen for predicates; an admin calls the endpoints directly until then.
-- The holder's page, in the courier app's WebView (SEAL-D8): the holder secret, `present` proved with the WASM
-  prover, the transaction handed to the sponsor (S1f). Its bundle decides SEAL-D9.
-- The public verifier page: a challenge, an approved predicate, and the challenge read back as answered (S1g).
+- The courier app's side of S1f (`kinetix-courier-mobile`): the holder secret in secure storage, the hidden WebView,
+  scanning a verifier's QR, consent, and handing the transaction over as an animated QR or a share link.
+- The public verifier page: a challenge, an approved predicate, receiving the holder's transaction, relaying it,
+  and the challenge read back as answered (S1g).
 - A gRPC server of seal's own: nothing calls seal over the mesh yet.
 - S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions, S3 anonymous reports.

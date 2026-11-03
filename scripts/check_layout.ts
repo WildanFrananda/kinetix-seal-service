@@ -2,7 +2,7 @@ import { globSync, readFileSync, writeFileSync } from "node:fs"
 
 import { fixLayout, layoutProblems } from "./layout_rules.ts"
 
-const patterns = ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "prisma.config.ts"]
+const patterns = ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "holder/**/*.ts", "prisma.config.ts"]
 
 const skipped = [/^src\/infrastructure\/postgres\/generated\//]
 

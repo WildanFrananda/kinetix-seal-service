@@ -1,4 +1,5 @@
 import {
+  type Binding,
   type PreBinding,
   type Proof,
   type SignatureEnabled,
@@ -8,7 +9,7 @@ import type { WalletFacade } from "@midnightntwrk/wallet-sdk"
 
 import type { TransactionPayerPort } from "../../application/ports/transaction_payer.port.ts"
 import type { WalletKeys } from "../../types/wallet_keys.type.ts"
-import { payAndSubmit } from "./wallet_transactions.ts"
+import { payAndSubmit, sponsorAndSubmit } from "./wallet_transactions.ts"
 
 class FacadeTransactionPayer implements TransactionPayerPort {
   private readonly wallet: WalletFacade
@@ -21,7 +22,15 @@ class FacadeTransactionPayer implements TransactionPayerPort {
   }
 
   pay(unboundTransaction: Uint8Array): Promise<string> {
-    const turn = this.queue.then(() => this.payNow(unboundTransaction))
+    return this.inTurn(() => this.payNow(unboundTransaction))
+  }
+
+  sponsor(boundTransaction: Uint8Array): Promise<string> {
+    return this.inTurn(() => this.sponsorNow(boundTransaction))
+  }
+
+  private inTurn(spend: () => Promise<string>): Promise<string> {
+    const turn = this.queue.then(spend)
 
     this.queue = turn.catch(() => undefined)
 
@@ -37,6 +46,17 @@ class FacadeTransactionPayer implements TransactionPayerPort {
     )
 
     return payAndSubmit(this.wallet, this.keys, transaction)
+  }
+
+  private async sponsorNow(boundTransaction: Uint8Array): Promise<string> {
+    const transaction = Transaction.deserialize<SignatureEnabled, Proof, Binding>(
+      "signature",
+      "proof",
+      "binding",
+      boundTransaction
+    )
+
+    return sponsorAndSubmit(this.wallet, this.keys, transaction)
   }
 }
 
