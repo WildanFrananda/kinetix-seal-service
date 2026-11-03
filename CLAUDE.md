@@ -380,6 +380,9 @@ seal, so at presentation time seal sees the verifier's address and never the hol
   refuses any GPL, AGPL, LGPL, SSPL, BSL, BUSL or FSL package, or one without a licence, except the three WASM
   packages, Apache-2.0 at `midnightntwrk/midnight-ledger`; `THIRD_PARTY_NOTICES.txt` carries every licence.
   `tests/holder/holder_bundle.test.ts` runs the built bundle itself in Node and proves a presentation with it.
+  In the image, the `contracts` stage copies the parameters out of its BuildKit cache mount into its own output,
+  and the build stage takes them from there: a CI runner restores the stage's layers from cache without running
+  `compactc`, so the cache mount is empty there (CI failed that way on 2026-11-03).
 - **Seal serves it** at `GET /api/v1/seal/holder` (the current build, `no-cache`) and
   `GET /api/v1/seal/holder/{digest}/{file}` (immutable for a year; the page with a CSP that allows only its own
   scripts, `wasm-unsafe-eval` and its own origin). The service refuses to start without a build.
