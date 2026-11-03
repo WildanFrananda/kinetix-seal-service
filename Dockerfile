@@ -52,14 +52,17 @@ COPY --from=contracts /app/managed ./managed
 COPY --from=contracts /app/zk-params /zk-params
 COPY src ./src
 COPY holder ./holder
+COPY verifier ./verifier
 COPY scripts ./scripts
 RUN npx prisma generate \
  && npx tsc -p tsconfig.json \
  && MIDNIGHT_PP=/zk-params node scripts/build_holder.ts \
+ && node scripts/build_verifier.ts \
  && npx prisma --version \
  && test -x "$(ls node_modules/@prisma/engines/schema-engine-* | head -n 1)" \
  && test -f dist/src/main.js \
- && test -f dist/holder-bundle/current.json
+ && test -f dist/holder-bundle/current.json \
+ && test -f dist/verifier-bundle/current.json
 
 FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
 

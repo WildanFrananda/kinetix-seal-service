@@ -6,7 +6,7 @@ import { describe, it } from "node:test"
 import { Registry } from "prom-client"
 
 import Readiness from "../../src/application/readiness.service.ts"
-import HolderAssets from "../../src/infrastructure/http/holder_assets.ts"
+import BundleAssets from "../../src/infrastructure/http/bundle_assets.ts"
 import { registerHolderRoutes } from "../../src/infrastructure/http/holder_routes.ts"
 import { buildHttpServer } from "../../src/infrastructure/http/http_server.ts"
 import { estateMetrics } from "../../src/infrastructure/observability/estate_metrics.ts"
@@ -41,7 +41,10 @@ function surface() {
   })
 
   registerHolderRoutes(server, {
-    assets: HolderAssets.load(holderDirectory({ "index.html": "<!doctype html>", "holder.js": "1", "x.wasm": "w" })),
+    assets: BundleAssets.load(holderDirectory({ "index.html": "<!doctype html>", "holder.js": "1", "x.wasm": "w" }), [
+      "index.html",
+      "holder.js"
+    ]),
     metrics
   })
 
@@ -86,6 +89,9 @@ describe("the holder's files", () => {
   })
 
   it("refuses to start without a page or a script", () => {
-    assert.throws(() => HolderAssets.load(holderDirectory({ "index.html": "x" })), /no page or no script/)
+    assert.throws(
+      () => BundleAssets.load(holderDirectory({ "index.html": "x" }), ["index.html", "holder.js"]),
+      /lacks holder\.js/
+    )
   })
 })

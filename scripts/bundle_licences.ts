@@ -85,7 +85,7 @@ function licenceRefusals(packages: readonly BundledPackage[]): string[] {
 
 async function noticesOf(packages: readonly BundledPackage[]): Promise<string> {
   const sections = [
-    "Third-party software in the Kinetix seal holder runtime.",
+    "Third-party software in this Kinetix seal bundle.",
     "The credential registry contract it runs is MIT (its SPDX headers)."
   ]
 

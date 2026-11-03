@@ -1,10 +1,13 @@
 import type { FastifyInstance } from "fastify"
 
 import type { PresentationRouteDependencies } from "../../types/presentation_route_dependencies.type.ts"
+import type { PresentationStatus } from "../../types/presentation_status.type.ts"
 import { problem } from "./problem.ts"
 import { routeTemplate } from "./route_template.ts"
 
 const presentationsRoute = "/api/v1/seal/presentations"
+const presentationRoute = "/api/v1/seal/presentations/:challenge"
+const challengePattern = /^[0-9a-f]{64}$/
 const requestBodyLimit = 16_384
 const sponsorRetryAfterSeconds = 30
 const transactionPattern = /^([0-9a-f]{2})+$/
@@ -25,9 +28,45 @@ function transactionOf(body: unknown): Uint8Array | undefined {
 }
 
 function registerPresentationRoutes(server: FastifyInstance, dependencies: PresentationRouteDependencies): void {
-  const { relay, logger, metrics } = dependencies
+  const { relay, statuses, logger, metrics } = dependencies
 
   metrics.httpRequests.inc({ method: "POST", route: routeTemplate(presentationsRoute), status: "202" }, 0)
+  metrics.httpRequests.inc({ method: "GET", route: routeTemplate(presentationRoute), status: "200" }, 0)
+
+  server.get<{ Params: { challenge: string } }>(presentationRoute, async (request, reply) => {
+    reply.header("Cache-Control", "no-store")
+
+    const { challenge } = request.params
+
+    if (!challengePattern.test(challenge)) {
+      return reply.code(400).send(problem("INVALID_REQUEST", "a challenge is 32 bytes in lowercase hex", request.id))
+    }
+
+    let status: PresentationStatus | undefined
+
+    try {
+      status = await statuses.statusOf(challenge)
+    } catch (error) {
+      logger.warn({
+        message: "the registry could not be read for a presentation",
+        requestId: request.id,
+        fields: { cause: error instanceof Error ? error.message : String(error) }
+      })
+    }
+
+    if (status === undefined) {
+      return reply
+        .code(503)
+        .header("Retry-After", String(sponsorRetryAfterSeconds))
+        .send(problem("REGISTRY_UNAVAILABLE", "the registry cannot be read now; try again later", request.id))
+    }
+
+    return reply.code(200).send({
+      status: status.predicateId === undefined ? "unanswered" : "answered",
+      predicateId: status.predicateId ?? null,
+      generation: status.generation
+    })
+  })
 
   server.post(presentationsRoute, { bodyLimit: requestBodyLimit }, async (request, reply) => {
     reply.header("Cache-Control", "no-store")

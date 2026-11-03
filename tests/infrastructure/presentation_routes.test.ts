@@ -3,12 +3,14 @@ import { describe, it } from "node:test"
 import { Registry } from "prom-client"
 
 import PresentationRelay from "../../src/application/presentation_relay.service.ts"
+import PresentationStatuses from "../../src/application/presentation_statuses.service.ts"
 import Readiness from "../../src/application/readiness.service.ts"
 import { buildHttpServer } from "../../src/infrastructure/http/http_server.ts"
 import { registerPresentationRoutes } from "../../src/infrastructure/http/presentation_routes.ts"
 import { estateMetrics } from "../../src/infrastructure/observability/estate_metrics.ts"
 import FakeDatabaseProbe from "../fakes/fake_database_probe.ts"
 import FakePresentationInspector from "../fakes/fake_presentation_inspector.ts"
+import FakePresentationLedger from "../fakes/fake_presentation_ledger.ts"
 import FakeRegistryGenerationStore from "../fakes/fake_registry_generation_store.ts"
 import FixedSponsorCondition from "../fakes/fixed_sponsor_condition.ts"
 import RecordingLogger from "../fakes/recording_logger.ts"
@@ -24,6 +26,8 @@ function surface() {
   const inspector = new FakePresentationInspector()
   const payer = new RecordingTransactionPayer()
   const logger = new RecordingLogger()
+  const ledger = new FakePresentationLedger()
+  const generations = new FakeRegistryGenerationStore([registryGeneration({ contractAddress: "02cc" })])
   const server = buildHttpServer({
     service: "kinetix-seal-service",
     readiness: new Readiness(new FakeDatabaseProbe(true), new FixedSponsorCondition("healthy")),
@@ -36,14 +40,17 @@ function surface() {
     relay: new PresentationRelay({
       inspector,
       payer,
-      generations: new FakeRegistryGenerationStore([registryGeneration({ contractAddress: "02cc" })]),
+      generations,
       metrics: new RecordingPresentationMetrics()
+    }),
+    statuses: new PresentationStatuses(ledger, generations, 5, function now(): Date {
+      return new Date("2026-11-03T03:00:00Z")
     }),
     logger,
     metrics
   })
 
-  return { server, inspector, payer, logger }
+  return { server, inspector, payer, logger, ledger }
 }
 
 function relayed(server: ReturnType<typeof surface>["server"], payload: unknown) {
@@ -98,5 +105,40 @@ describe("the presentation relay route", () => {
     const { server } = surface()
 
     assert.equal((await relayed(server, { transaction: "00".repeat(9_000) })).statusCode, 413)
+  })
+
+  it("tells a verifier whether its challenge was answered, and under which predicate", async () => {
+    const { server, ledger } = surface()
+    const challenge = "c0".repeat(32)
+
+    assert.deepEqual((await server.inject({ url: `${route}/${challenge}` })).json(), {
+      status: "unanswered",
+      predicateId: null,
+      generation: 1
+    })
+
+    ledger.answers.set(challenge, "aa".repeat(32))
+
+    const later = surface()
+
+    later.ledger.answers.set(challenge, "aa".repeat(32))
+
+    const answered = await later.server.inject({ url: `${route}/${challenge}` })
+
+    assert.equal(answered.headers["cache-control"], "no-store")
+    assert.deepEqual(answered.json(), { status: "answered", predicateId: "aa".repeat(32), generation: 1 })
+  })
+
+  it("refuses a challenge that is not one, and answers 503 when the registry cannot be read", async () => {
+    const { server, ledger } = surface()
+
+    assert.equal((await server.inject({ url: `${route}/C0` })).statusCode, 400)
+
+    ledger.fails = new Error("the indexer timed out")
+
+    const unavailable = await server.inject({ url: `${route}/${"c0".repeat(32)}` })
+
+    assert.equal(unavailable.statusCode, 503)
+    assert.equal(unavailable.json().error, "REGISTRY_UNAVAILABLE")
   })
 })

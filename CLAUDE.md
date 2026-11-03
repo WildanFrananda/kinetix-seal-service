@@ -11,9 +11,10 @@ Today it runs, for real:
 - courier credentials: a courier asks, seal issues a snapshot of their facts into the registry (S1d);
 - predicates: an admin approves the minimums a holder may be asked to prove, seal keeps them in the registry (S1e);
 - the holder runtime a phone proves with, the registry snapshot it proves against, and the relay a verifier hands
-  a presentation to (S1f, SEAL-D9 and D18).
+  a presentation to (S1f, SEAL-D9 and D18);
+- the public page where anyone checks a courier's credential (S1g).
 
-What S1 still lacks is the courier app's screens and the verifier's page ("Not built yet").
+S1 for couriers is complete once the courier app's side (S1f) ships; what remains is in "Not built yet".
 
 ## Everything runs in Docker
 
@@ -399,9 +400,48 @@ seal, so at presentation time seal sees the verifier's address and never the hol
   sponsoring guide), in the same queue as seal's own spends, so it can neither change the call nor see a secret.
   `202 { txId }`; `503 SPONSOR_UNAVAILABLE` or `REGISTRY_UNAVAILABLE` with `Retry-After: 30`. Neither the route
   nor its logs record an address; the gateway limits it to 20 a minute per address.
+- **The presentation protocol** (SEAL-D18), which the courier app speaks and the verifier page (S1g) must speak
+  exactly:
+  - the verifier's request is a QR code `kinetix-seal:present?v=1&r=<registry address>&p=<predicate row id>&c=<challenge, 32 bytes hex>&a=<answer URL, https>`;
+  - in person, the holder's answer is a cycle of QR frames `KSP1:<first 8 hex of the transaction's SHA-256>:<i>/<n>:<chunk>`,
+    the chunks being 600 characters of the transaction's unpadded base64url, every 250 ms;
+  - remotely, it is the link `<answer URL>#<challenge>.<unpadded base64url transaction>`, the fragment never
+    reaching a server; the challenge lets the verifier's page match the answer to a request it made;
+  - the verifier rebuilds the transaction, hex-encodes it and posts `{ transaction }` to the relay, then reads
+    `GET /api/v1/seal/presentations/{challenge}` until the registry records it.
 - **Not checked before paying:** whether the challenge was already answered or the predicate row is still placed;
   a transaction that fails on chain costs its fee. The verifier page reads both first (S1g).
 - Metrics: `kinetix_seal_presentations_relayed_total{outcome}`.
+
+### The verifier page (S1g)
+
+Anyone checks a courier's credential at `GET /api/v1/seal/verify` on the API host, a page seal serves (the user
+chose seal over the docs site on 2026-11-03: the docs site has no CORS to the API and refuses the camera, and seal
+already serves the holder's page). No account and no token.
+
+- **The bundle** is `verifier/` (plain TypeScript and the DOM, no framework), built by `scripts/build_verifier.ts`
+  into `dist/verifier-bundle/<sha256>/` (`verifier.js`, `verifier.css`, `THIRD_PARTY_NOTICES.txt`) under the same
+  licence gate as the holder's. It bundles `qrcode-generator` (MIT) and `jsqr` (Apache-2.0). The page itself is
+  written by `verifier_routes.ts`, `no-cache`, its script and style under `/api/v1/seal/verify/assets/<digest>/`,
+  immutable; its CSP allows only seal's own origin, and `Permissions-Policy` allows the camera on this page only.
+- **The flow.** The page lists the approved predicates whose current row the registry holds; the verifier picks one,
+  and the page makes a challenge in the browser, keeps it in `localStorage` for two hours (twenty at most), and shows
+  the request QR (the protocol above, `a` = the page's own address). In person it reads the courier's cycling frames
+  with the camera (`BarcodeDetector` where the browser has it, `jsqr` otherwise); remotely the courier's link opens
+  the same page, which reads the fragment and clears it from the address bar. Either way the page asks
+  `GET /api/v1/seal/presentations/{challenge}` first, relays the transaction only if the challenge is unanswered,
+  then asks every five seconds for three minutes.
+- **The verdict** is what the registry recorded for the challenge, described from the public predicate list:
+  "Verified: <label>" with the minimums. An answer to a challenge this browser never made is shown with the warning
+  that it cannot tell whether it was meant for this verifier; an answer under another predicate than the one asked is
+  refused. An unreachable registry reads "not confirmed yet", never "invalid".
+- **`GET /api/v1/seal/presentations/{challenge}`** answers `{ status: "answered" | "unanswered", predicateId,
+  generation }` from the active registry's `presentations` map, read at most every five seconds however many pages
+  wait (`PresentationStatuses`), `503 REGISTRY_UNAVAILABLE` when it cannot be read. The gateway serves it on its own
+  route at the usual 100 a minute, apart from the relay's 20.
+- **Checked in a browser** on 2026-11-03: headless Chrome against a local harness serving the real bundle under the
+  page's CSP rendered the predicate list, and a link answer was relayed, polled and shown as verified, with no console
+  error. The camera path was not exercised headless.
 
 ## Prisma
 
@@ -451,7 +491,5 @@ seal, so at presentation time seal sees the verifier's address and never the hol
 - The backoffice screen for predicates; an admin calls the endpoints directly until then.
 - The courier app's side of S1f (`kinetix-courier-mobile`): the holder secret in secure storage, the hidden WebView,
   scanning a verifier's QR, consent, and handing the transaction over as an animated QR or a share link.
-- The public verifier page: a challenge, an approved predicate, receiving the holder's transaction, relaying it,
-  and the challenge read back as answered (S1g).
 - A gRPC server of seal's own: nothing calls seal over the mesh yet.
 - S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions, S3 anonymous reports.

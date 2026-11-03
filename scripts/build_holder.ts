@@ -1,10 +1,10 @@
-import { createHash } from "node:crypto"
-import { copyFile, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Zkir } from "@midnight-ntwrk/zkir-v2"
 import { build } from "esbuild"
 
-import { bundledPackages, licenceRefusals, noticesOf } from "./holder_licences.ts"
+import { bundledPackages, licenceRefusals, noticesOf } from "./bundle_licences.ts"
+import { publishBuild } from "./bundle_output.ts"
 import { hexOnlyAddressFormat, wasmBindgenLoader } from "./holder_plugins.ts"
 
 const paramsDirectory = process.env.MIDNIGHT_PP
@@ -26,18 +26,6 @@ const page = `<!doctype html>
 
 if (paramsDirectory === undefined || paramsDirectory === "") {
   throw new Error("MIDNIGHT_PP is required: the holder ships the prover's public parameters")
-}
-
-async function digestOf(directory: string): Promise<string> {
-  const hash = createHash("sha256")
-
-  for (const name of (await readdir(directory)).sort()) {
-    hash.update(name)
-    hash.update("\0")
-    hash.update(await readFile(join(directory, name)))
-  }
-
-  return hash.digest("hex")
 }
 
 await rm(outRoot, { recursive: true, force: true })
@@ -76,8 +64,6 @@ await copyFile(join(paramsDirectory, params), join(staging, params))
 await writeFile(join(staging, "index.html"), page)
 await writeFile(join(staging, "THIRD_PARTY_NOTICES.txt"), await noticesOf(packages))
 
-const digest = await digestOf(staging)
+const digest = await publishBuild(staging, outRoot)
 
-await rename(staging, join(outRoot, digest))
-await writeFile(join(outRoot, "current.json"), `${JSON.stringify({ digest })}\n`)
 process.stdout.write(`holder: ${digest}, ${packages.length} packages, none refused\n`)

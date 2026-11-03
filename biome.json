@@ -9,6 +9,7 @@
       "tests/**",
       "scripts/**",
       "holder/**",
+      "verifier/**",
       "prisma.config.ts",
       "!src/infrastructure/postgres/generated"
     ]
