@@ -16,7 +16,7 @@ RUN case "$BUILDARCH" in \
  && mkdir /compactc \
  && unzip -q "/tmp/$zip" -d /compactc
 
-FROM --platform=$BUILDPLATFORM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS contracts
+FROM --platform=$BUILDPLATFORM node:26.12.1-bookworm-slim@sha256:88e480776c6149ff1d098cd304f44bf18057fb5d284a3329b78162d29821e28c AS contracts
 
 COPY --from=compactc /compactc /opt/compactc
 COPY --from=compactc /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
@@ -33,7 +33,7 @@ RUN --mount=type=cache,id=kinetix-seal-zk-params,target=/zk-params \
  && mkdir -p /app/zk-params \
  && cp /zk-params/bls_midnight_2p* /app/zk-params/
 
-FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe AS build
+FROM node:26.12.1-bookworm-slim@sha256:88e480776c6149ff1d098cd304f44bf18057fb5d284a3329b78162d29821e28c AS build
 
 ENV PRISMA_HIDE_UPDATE_MESSAGE=1
 
@@ -64,7 +64,7 @@ RUN npx prisma generate \
  && test -f dist/holder-bundle/current.json \
  && test -f dist/verifier-bundle/current.json
 
-FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+FROM node:26.12.1-bookworm-slim@sha256:88e480776c6149ff1d098cd304f44bf18057fb5d284a3329b78162d29821e28c
 
 ARG KINETIX_SEAL_SERVICE_VERSION
 
