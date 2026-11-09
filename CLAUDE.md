@@ -14,7 +14,9 @@ Today it runs, for real:
   a presentation to (S1f, SEAL-D9 and D18);
 - the public page where anyone checks a courier's credential (S1g).
 
-S1 for couriers is complete once the courier app's side (S1f) ships; what remains is in "Not built yet".
+S1 for couriers ran end to end on production on 2026-11-09, with the courier app at v1.0.0: a real delivery, a
+credential issued to the app, and the public page answering Verified. Its exit still owes the reset drill
+("Registry generations" below); what remains beyond S1 is in "Not built yet".
 
 ## Everything runs in Docker
 
@@ -211,6 +213,16 @@ contracts/
 - **A deploy is recorded before it is submitted** (`deploying`, with the contract address the unproven deploy
   already knows). If it never confirms, the next check retires it as `interrupted` and deploys again; the
   orphan, if it landed, costs one fee and holds nothing.
+- **A drill retires the active generation on purpose.** A healthy chain never replaces a generation, so the plan's
+  reset drill (S1's exit) has its own command, `node dist/src/cli/retire_registry.js`, which reads only
+  `KINETIX_SEAL_DATABASE_URL` and `KINETIX_SEAL_DRILL_GENERATION`, the generation the operator means to retire. It
+  writes one retirement, reason `drill`, through `RegistryDrill`, and refuses a generation that is not the active
+  one, a moment with none active (a deploy in flight is left alone), and any network but `preprod`, `preview` and
+  `undeployed`: on mainnet a new generation costs real fees and is the owner's decision, not a drill. Everything
+  else is the running service's, as after a reset: its next check deploys the next generation, `CredentialIssuer`
+  re-issues each courier's current credential there, and `PredicateKeeper` places the live templates' rows. It
+  starts no wallet, so it runs with the service up:
+  `docker compose run --rm --no-deps -e KINETIX_SEAL_DRILL_GENERATION=<n> kinetix-seal-service node dist/src/cli/retire_registry.js`.
 - **The issuer secret** (`KINETIX_SEAL_ISSUER_SECRET`, 32 bytes of lowercase hex, in SOPS, one per environment)
   is redacted from every output. The maintenance authority's signing key is derived from it and the generation
   number, so nothing stores it: every change is a new generation anyway.
@@ -488,8 +500,5 @@ already serves the holder's page). No account and no token.
 
 ## Not built yet
 
-- The backoffice screen for predicates; an admin calls the endpoints directly until then.
-- The courier app's side of S1f (`kinetix-courier-mobile`): the holder secret in secure storage, the hidden WebView,
-  scanning a verifier's QR, consent, and handing the transaction over as an animated QR or a share link.
 - A gRPC server of seal's own: nothing calls seal over the mesh yet.
 - S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions, S3 anonymous reports.

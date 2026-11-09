@@ -64,3 +64,9 @@ node dist/src/cli/sponsor_address.js                        # the sponsor's addr
 node dist/src/cli/register_dust.js                          # register the sponsor's NIGHT for DUST
 KINETIX_SEAL_SPLIT_OUTPUTS=10 node dist/src/cli/split_night.js   # split the NIGHT into ten UTXOs
 ```
+
+The reset drill starts no wallet, so it runs while the service is up, in the service's image:
+
+```sh
+KINETIX_SEAL_DRILL_GENERATION=1 node dist/src/cli/retire_registry.js   # retire generation 1; the service deploys 2
+```
