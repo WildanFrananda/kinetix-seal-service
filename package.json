@@ -31,7 +31,7 @@
     "@prisma/client": "7.10.1",
     "@scure/bip39": "2.4.0",
     "fastify": "5.12.7",
-    "jose": "6.2.12",
+    "jose": "6.2.13",
     "kinetix-contracts": "1.7.1",
     "pg": "8.23.1",
     "prisma": "7.10.1",
@@ -39,8 +39,8 @@
     "rxjs": "7.8.2"
   },
   "devDependencies": {
-    "@babel/parser": "8.0.7",
-    "@biomejs/biome": "2.5.15",
+    "@babel/parser": "8.0.8",
+    "@biomejs/biome": "2.6.3",
     "@midnightntwrk/zkir-v3": "3.2.0",
     "@types/node": "26.6.5",
     "@types/pg": "8.23.1",
