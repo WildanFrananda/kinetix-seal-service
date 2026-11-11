@@ -13,7 +13,8 @@ describe("the browser bundles' licence gate", () => {
       licenceRefusals([
         bundled("effect", "MIT"),
         bundled("ieee754", "BSD-3-Clause"),
-        bundled("@midnight-ntwrk/ledger-v8", undefined),
+        bundled("@midnightntwrk/ledger-v9", undefined),
+        bundled("@midnightntwrk/zkir-v3", undefined),
         bundled("@midnight-ntwrk/compact-runtime", "Apache-2.0")
       ]),
       []

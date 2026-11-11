@@ -1,6 +1,6 @@
 import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
-import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js"
+import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
 
 import { Contract } from "#contracts/credential_registry/contract/index.js"
 import type { CredentialRegistryPrivateState } from "../../types/credential_registry_private_state.type.ts"

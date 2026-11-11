@@ -8,9 +8,11 @@ const refused = /\b(A?GPL|LGPL|SSPL|BUSL|BSL|FSL)\b/i
 const licenceFiles = /^(licen[cs]e|copying|notice)(\.(md|txt))?$/i
 
 const sourceLicences = new Map<string, string>([
-  ["@midnight-ntwrk/ledger-v8", "Apache-2.0 (midnightntwrk/midnight-ledger)"],
+  ["@midnightntwrk/ledger-v8", "Apache-2.0 (midnightntwrk/midnight-ledger)"],
+  ["@midnightntwrk/ledger-v9", "Apache-2.0 (midnightntwrk/midnight-ledger)"],
   ["@midnight-ntwrk/onchain-runtime-v3", "Apache-2.0 (midnightntwrk/midnight-ledger)"],
-  ["@midnight-ntwrk/zkir-v2", "Apache-2.0 (midnightntwrk/midnight-ledger)"]
+  ["@midnightntwrk/onchain-runtime-v4", "Apache-2.0 (midnightntwrk/midnight-ledger)"],
+  ["@midnightntwrk/zkir-v3", "Apache-2.0 (midnightntwrk/midnight-zkir)"]
 ])
 
 function packageDirectoryOf(input: string): string | undefined {

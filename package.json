@@ -18,16 +18,15 @@
   "dependencies": {
     "@bufbuild/protobuf": "2.16.0",
     "@grpc/grpc-js": "1.14.6",
-    "@midnight-ntwrk/compact-runtime": "0.16.0",
-    "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
-    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
-    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",
-    "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
-    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "4.1.1",
-    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
-    "@midnight-ntwrk/midnight-js-types": "4.1.1",
-    "@midnight-ntwrk/midnight-js-utils": "4.1.1",
-    "@midnightntwrk/wallet-sdk": "1.2.0",
+    "@midnight-ntwrk/compact-runtime": "0.21.0",
+    "@midnight-ntwrk/midnight-js-contracts": "5.0.0",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "5.0.0",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "5.0.0",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "5.0.0",
+    "@midnight-ntwrk/midnight-js-protocol": "5.0.0",
+    "@midnight-ntwrk/midnight-js-types": "5.0.0",
+    "@midnight-ntwrk/midnight-js-utils": "5.0.0",
+    "@midnightntwrk/wallet-sdk": "2.0.0",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "@scure/bip39": "2.4.0",
@@ -42,7 +41,7 @@
   "devDependencies": {
     "@babel/parser": "8.0.7",
     "@biomejs/biome": "2.5.15",
-    "@midnight-ntwrk/zkir-v2": "2.1.1",
+    "@midnightntwrk/zkir-v3": "3.2.0",
     "@types/node": "26.6.5",
     "@types/pg": "8.23.1",
     "esbuild": "0.28.2",
@@ -51,6 +50,8 @@
     "typescript": "7.0.2"
   },
   "overrides": {
-    "@midnight-ntwrk/onchain-runtime-v3": "3.0.0"
+    "@midnight-ntwrk/platform-js": "3.0.0",
+    "@midnightntwrk/ledger-v9": "1.0.0",
+    "@midnightntwrk/onchain-runtime-v4": "4.0.0"
   }
 }

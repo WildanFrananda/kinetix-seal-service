@@ -57,7 +57,7 @@ updates:
     ignore:
       - dependency-name: "@openzeppelin/compact-contracts"
         versions:
-          - ">= 0.4.0"
+          - ">= 0.5.0"
     commit-message:
       prefix: "deps(contracts)"
   - package-ecosystem: docker

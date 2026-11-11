@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { type SigningKey, signingKeyFromBip340 } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime"
+import { type SigningKey, signingKeyFromBip340 } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime"
 
 function maintenanceSigningKey(issuerSecret: Uint8Array, generation: number): SigningKey {
   const index = Buffer.alloc(4)

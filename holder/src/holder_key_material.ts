@@ -2,12 +2,14 @@ import {
   createProverKey,
   createVerifierKey,
   createZKIR,
+  hashVerifierKey,
   type ProverKey,
+  parseContractKeyLocation,
   type VerifierKey,
   ZKConfigProvider,
   type ZKIR
 } from "@midnight-ntwrk/midnight-js-types"
-import type { KeyMaterialProvider, ProvingKeyMaterial } from "@midnight-ntwrk/zkir-v2"
+import type { KeyMaterialProvider, ProvingKeyMaterial } from "@midnightntwrk/zkir-v3"
 
 import type { PresentKeyMaterial } from "../types/present_key_material.type.ts"
 
@@ -44,11 +46,21 @@ class HolderKeyMaterial extends ZKConfigProvider<"present"> implements KeyMateri
   }
 
   async lookupKey(keyLocation: string): Promise<ProvingKeyMaterial | undefined> {
-    if (keyLocation !== "present") {
+    const location = parseContractKeyLocation(keyLocation)
+
+    if (
+      location === undefined ||
+      location.circuitId !== "present" ||
+      location.verifierKeyHash !== hashVerifierKey(this.material.verifierKey)
+    ) {
       return undefined
     }
 
     return { proverKey: this.material.proverKey, verifierKey: this.material.verifierKey, ir: this.material.ir }
+  }
+
+  override async getArtifactRuntimeVersion(): Promise<string> {
+    return this.material.runtimeVersion
   }
 
   async getParams(k: number): Promise<Uint8Array> {

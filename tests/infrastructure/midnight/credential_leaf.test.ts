@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import { randomBytes } from "node:crypto"
 import { describe, it } from "node:test"
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
 
 import { type Predicate, pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import { courierClassId } from "../../../src/domain/credential_classes.ts"
@@ -11,8 +10,6 @@ import type { HolderPrivateState } from "../../../src/types/holder_private_state
 import type { IssuerPrivateState } from "../../../src/types/issuer_private_state.type.ts"
 import { credentialRecord } from "../../fakes/credential_record.ts"
 import InMemoryCredentialRegistry from "./in_memory_credential_registry.ts"
-
-setNetworkId("undeployed")
 
 const predicate: Predicate = { classId: courierClassId, minimums: [10n, 400n, 7n, 20_700n] }
 

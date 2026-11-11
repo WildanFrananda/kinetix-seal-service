@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
-    "@openzeppelin/compact-contracts": "0.3.0"
+    "@openzeppelin/compact-contracts": "0.4.0"
   },
   "overrides": {
     "ansi-regex": "6.4.0"

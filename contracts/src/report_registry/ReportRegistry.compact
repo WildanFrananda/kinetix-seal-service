@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+import CompactStandardLibrary;
+import "@openzeppelin/compact-contracts/security/Pausable" prefix Pausable_;
+import "../credential_registry/IssuerAuthority";
+import "FiledReport";
+import "FiledReports";
+import "GrantedRights";
+import "Reporter";
+
+constructor(initialIssuerPk: Bytes<32>) {
+  initializeIssuer(initialIssuerPk);
+}
+
+circuit grant(leaf: Bytes<32>): [] {
+  assertIssuer();
+  Pausable_assertNotPaused();
+  _grant(leaf);
+}
+
+circuit seedReport(nullifier: Bytes<32>, report: FiledReport): [] {
+  assertIssuer();
+  _fileReport(nullifier, report);
+}
+
+circuit pause(): [] {
+  assertIssuer();
+  Pausable__pause();
+}
+
+circuit unpause(): [] {
+  assertIssuer();
+  Pausable__unpause();
+}
+
+circuit report(merchant: Bytes<32>, window: Uint<32>, digest: Bytes<32>): [] {
+  Pausable_assertNotPaused();
+
+  const secret = reporterSecret();
+  const order = heldOrder();
+  const leaf = rightLeaf(merchant, window, order, reporterKey(secret));
+  const path = rightPath(leaf);
+
+  assert(path.leaf == leaf, "the path does not lead to the right");
+  assertGranted(path);
+  _fileReport(reportNullifier(secret, order), FiledReport { merchant: merchant, window: window, digest: digest });
+}
+
+export {
+  FiledReport,
+  issuerPk,
+  proposedIssuerPk,
+  rights,
+  reports,
+  Pausable__isPaused,
+  issuerPublicKey,
+  reporterKey,
+  rightLeaf,
+  reportNullifier,
+  grant,
+  seedReport,
+  proposeIssuer,
+  acceptIssuer,
+  pause,
+  unpause,
+  report
+};

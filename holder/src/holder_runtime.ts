@@ -1,4 +1,5 @@
-import { Zkir } from "@midnight-ntwrk/zkir-v2"
+import { parseZkArtifactRuntimeVersion } from "@midnight-ntwrk/midnight-js-utils"
+import { Zkir } from "@midnightntwrk/zkir-v3"
 
 import { pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import type { AssetFetcher } from "../types/asset_fetcher.type.ts"
@@ -44,10 +45,11 @@ class HolderRuntime {
   }
 
   private async load(): Promise<HolderKeyMaterial> {
-    const [proverKey, verifierKey, ir] = await Promise.all([
+    const [proverKey, verifierKey, ir, manifest] = await Promise.all([
       this.fetchAsset("present.prover"),
       this.fetchAsset("present.verifier"),
-      this.fetchAsset("present.bzkir")
+      this.fetchAsset("present.bzkir"),
+      this.fetchAsset("contract-manifest.json")
     ])
 
     const k = Zkir.deserialize(ir).getK()
@@ -57,6 +59,7 @@ class HolderRuntime {
       proverKey,
       verifierKey,
       ir,
+      runtimeVersion: parseZkArtifactRuntimeVersion(new TextDecoder().decode(manifest)),
       params: async function paramsOf(asked: number): Promise<Uint8Array> {
         if (asked !== k) {
           throw new Error(`the holder carries the parameters for k=${k}, not k=${asked}`)

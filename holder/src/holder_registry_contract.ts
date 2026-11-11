@@ -1,4 +1,4 @@
-import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js"
+import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
 
 import { Contract } from "#contracts/credential_registry/contract/index.js"
 import { credentialRegistryWitnesses } from "../../src/infrastructure/midnight/credential_registry_witnesses.ts"

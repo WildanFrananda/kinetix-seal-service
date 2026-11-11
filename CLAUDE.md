@@ -141,13 +141,24 @@ test. It refuses to start without the toolchain's database: a skipped database t
 - **The state volume** (`KINETIX_SEAL_WALLET_STATE_DIR`) holds the serialized wallet. It is checkpointed every
   `KINETIX_SEAL_WALLET_CHECKPOINT_SECONDS` and on SIGTERM, atomically, mode 600. Losing it costs a full sync,
   not funds: the seed is in SOPS. Estate backups do not cover it.
-- **Error 170.** The node sometimes rejects a DUST spend as `InvalidDustSpendProof`: midnight-wallet #804, open,
-  in `dust-wallet` 4.2.0. The rejected coin then vanishes from the wallet for about three hours, the DUST grace
+- **Error 170.** The node sometimes rejected a DUST spend as `InvalidDustSpendProof`: midnight-wallet #804, in
+  `dust-wallet` 4.2.0, fixed in wallet SDK 2.0.0 (balancing now waits until the wallet holds the Dust roots it dates
+  the spend at). The split below stays: it costs nothing and keeps sponsoring through one bad coin. The rejected coin then vanishes from the wallet for about three hours, the DUST grace
   period. With one DUST coin that stops all sponsoring, so the sponsor's NIGHT is split into about ten UTXOs
   (`split_night.js`), each of which generates its own DUST coin. `kinetix_seal_sponsor_dust_coins` falling is
   the signal.
 - **Fees** were 0 to 1 SPECK per transaction on Preprod (2026-10-21). `additionalFeeOverhead` is 1,000 SPECK,
   as in the official example: the overhead is paid on every transaction.
+- **Ledger 9 (wallet SDK 2.0.0, since 2026-11-11).** Preprod moved to ledger 9 in place on 2026-11-09 at block
+  3,348,434; wallet SDK 1.x cannot decode its events (`midnight:event[v14]`) and the sponsor sat `syncing` from
+  2026-11-10 02:24 UTC until this move. The wallet starts from `WalletSeeds.fromMasterSeed`, which derives the same
+  account 0, index 0 and the Zswap, NightExternal and Dust roles the 1.x code derived, so the address does not change
+  (`tests/infrastructure/midnight/wallet_keys.test.ts`). No transacting call takes secret keys any more; transactions
+  enter the facade as handles (`adoptTransaction(bytes, "Unbound" | "Finalized")`) and are signed with the keystore's
+  `signDataAsync`. A 1.x state file is read and upgraded on restore; a fresh sync skips the ledger 8 Dust history
+  (`skipLedgerV8DustHistory`). The upgrade cleared Dust registrations not backed by cNIGHT, so `register_dust.js` is run
+  once after the first ledger 9 start; it registers only UTXOs that are not registered. The proof server is
+  `midnightntwrk/proof-server` 9.0.0 (compactc 0.36 emits ZKIR v3 only; 8.x refuses it).
 
 ## Contracts
 
@@ -161,20 +172,29 @@ contracts/
 ```
 
 - **`bin/contracts`** installs `contracts/node_modules` (`npm ci`, scripts off), then compiles each
-  `src/<feature>/<Feature>.compact` into `managed/<feature>/` with `compactc` 0.31.1, with
+  `src/<feature>/<Feature>.compact` into `managed/<feature>/` with `compactc` 0.36.0 (language 0.28.0), with
   `COMPACT_PATH=contracts/node_modules` so libraries are imported by package path. `managed/` holds the
   TypeScript contract, the ZKIR and the proving keys: a build output, never committed. Code imports it as
   `#contracts/<feature>/contract/index.js`, through `package.json`'s `imports`, so the same path works from
   `src/`, `tests/` and `dist/`.
 - **OpenZeppelin Contracts for Compact** (`@openzeppelin/compact-contracts`, MIT) is the library, as
-  OpenZeppelin's Solidity contracts are notary's. 0.3.0 targets ledger 8 and compiler 0.31.0 and was audited in
+  OpenZeppelin's Solidity contracts are notary's. 0.4.0 (2026-11-04) is its ledger 9 release; seal moved to it with
+  ledger 9 on 2026-11-11, at seven days old, under the user's exception for the ledger 9 set. Its `Pausable` differs
+  from 0.3.0's only in comments, the version header and the pragma (`>= 0.26.0`), so the audited logic is unchanged.
+  Before it, 0.3.0 targeted ledger 8 and compiler 0.31.0 and was audited in
   August and October 2026; pre-releases (`-alpha`, `-rc`) are unaudited and never used. It ships no witnesses:
   every witness here is ours. 0.3.0 was ten days old when the user asked for it (2026-10-30, *"oke tolong
   gunakan"*), inside the two-week rule; its `Pausable` is identical to 0.3.0-rc.2, which the October audit
   covers, and the package carries npm provenance. Its CLI dependency drags `ansi-regex`, pinned to 6.4.0 by
   `overrides` because 6.5.0 was a day old.
 - **The compiler is pinned.** Under SEAL-D10 the holder key and the leaf are `transientHash`, which may change
-  between compiler versions, so a compiler change is a new contract generation (`SEAL-SERVICE.md` §6.4).
+  between compiler versions, so a compiler change is a new contract generation (`SEAL-SERVICE.md` §6.4). Measured on
+  2026-11-11: 0.31.1 → 0.36.0 left `holderPublicKey`, `credentialLeaf` and `predicateId` unchanged
+  (`tests/infrastructure/midnight/holder_key_vectors.test.ts` pins 0.31.1's values), so holders keep their keys and a
+  new generation re-issues the same leaves. The generation still changes, because the verifier keys did.
+- **Artifacts are ledger 9.** compactc 0.36.0 writes `compiler/contract-manifest.json`, which midnight-js 5 reads for
+  the runtime version (`0.21.0`) that places a contract on its ledger era, and checks every artifact against
+  (`verify: "require"`, the default). Artifacts from 0.31 cannot be deployed or maintained on a ledger 9 network.
 - **Keys are generated in CI or in the image build** (the Dockerfile's `contracts` stage, on the build
   platform), never on the VPS: `zkir` dies with SIGILL on a CPU without ADX. Key generation downloads the
   public parameters into `MIDNIGHT_PP` (the toolchain's `zk_params` volume, a build cache in Docker).
@@ -252,8 +272,11 @@ contracts/
   no proof and no network. A failed `assert` carries its message in the error. An error thrown by a witness
   arrives wrapped in `ContractRuntimeError: Error executing circuit '…'`, with the witness's error as its
   `cause`.
-- **`present` must stay at k=12** (a test reads its ZKIR): that is what keeps a phone at about a minute
-  (SEAL-D11). A change that grows it is a decision for the user, not a refactor.
+- **`present` must stay at k ≤ 12** (a test reads its ZKIR): that is what keeps a phone at about a minute
+  (SEAL-D11). A change that grows it is a decision for the user, not a refactor. Since compactc 0.36.0 it is k=11.
+- **Low-level builders take `config`** (`{ networkId, ttlSeconds }`; midnight-js 5 has no global network id), and
+  their state inputs are `Serialized*` from `@midnight-ntwrk/midnight-js-types`, decoded with the caller's own
+  `ContractState` (`tests/infrastructure/midnight/in_memory_states.ts`).
 
 ### The credential registry (S1)
 
@@ -384,14 +407,29 @@ seal, so at presentation time seal sees the verifier's address and never the hol
   into the transaction. The proof runs on the page's thread: the WebView is hidden and its screens are Flutter's,
   so nothing waits on it.
 - **The bundle** (`scripts/build_holder.ts`, esbuild, run by `bin/ci` and the image build) is
-  `dist/holder-bundle/<sha256 of its files>/`: `index.html`, `holder.js`, the three WASM files, `present`'s
-  prover key, verifier key and IR, and `bls_midnight_2p12` (from `MIDNIGHT_PP`), about 7 MB compressed. Two esbuild
-  plugins do what a WASM-aware bundler would: `wasm-bindgen-loader` gives each Midnight WASM package a loader that
-  streams its `.wasm` and passes the snippet modules its imports name, and `hex-only-address-format` replaces
-  `@midnight-ntwrk/wallet-sdk-address-format`, the only way GPL code (`@subsquid/*`) entered, with a module that
-  throws on bech32: midnight-js returns hex keys before reaching it, and the holder passes hex only. The build
-  refuses any GPL, AGPL, LGPL, SSPL, BSL, BUSL or FSL package, or one without a licence, except the three WASM
-  packages, Apache-2.0 at `midnightntwrk/midnight-ledger`; `THIRD_PARTY_NOTICES.txt` carries every licence.
+  `dist/holder-bundle/<sha256 of its files>/`: `index.html`, `holder.js` and its chunks, the WASM files, `present`'s
+  prover key, verifier key and IR, the contract's `contract-manifest.json`, and `bls_midnight_2p<k>` (from
+  `MIDNIGHT_PP`, k=11 today). Two esbuild plugins do what a WASM-aware bundler would: `wasm-bindgen-loader` gives
+  each Midnight WASM package a loader that streams its `.wasm` and passes the snippet modules its imports name, and
+  points a snippet's `#self` at the package's `_bg.js` glue rather than at the loader (ledger-v9's snippets import
+  `#self`; through the loader that is a top-level-await cycle, and the bundle never starts); `hex-only-address-format`
+  replaces `@midnightntwrk/wallet-sdk-address-format`, the only way GPL code (`@subsquid/*`) entered, with a module
+  that throws on bech32: midnight-js returns hex keys before reaching it, and the holder passes hex only.
+  **The build splits** (`splitting: true`): midnight-js 5 loads the ledger 8 era with a dynamic `import()`, and without
+  splitting esbuild turns every module reachable from it, `compact-runtime` included, into a lazy init whose re-exports
+  are not awaited, so the compiled contract ran before `compact-runtime` had defined `emptyRunningCost`. Split, the v8
+  era is its own chunk and the rest stays native ESM. The page fetches the ledger-v9, onchain-runtime-v4 and zkir-v3
+  WASM at start; ledger-v8 and onchain-runtime-v3 are in the build but fetched only if the ledger 8 era were ever
+  loaded, which the holder never does. The build refuses any GPL, AGPL, LGPL, SSPL, BSL, BUSL or FSL package, or one
+  without a licence, except the Midnight WASM packages (`ledger-v8`, `ledger-v9`, `onchain-runtime-v3`,
+  `onchain-runtime-v4`: Apache-2.0 at `midnightntwrk/midnight-ledger`; `zkir-v3`: Apache-2.0 at
+  `midnightntwrk/midnight-zkir`); `THIRD_PARTY_NOTICES.txt` carries every licence.
+- **Ledger 9 in the holder.** It proves with `@midnightntwrk/zkir-v3` (zkir-v2 cannot read ZKIR v3). The prover asks
+  for keys by the canonical location `contract:<address>/present?vk=<sha-256 of the verifier key>`; the holder answers
+  only for `present` and only when that hash is its own verifier key's, so a page from another build refuses rather
+  than proving with the wrong keys. The runtime version midnight-js asks every ZK config provider for is read from the
+  bundled `contract-manifest.json`, never assumed. The snapshot's states reach midnight-js as `Serialized*` of era
+  `v9`, which refuse bytes of another era.
   `tests/holder/holder_bundle.test.ts` runs the built bundle itself in Node and proves a presentation with it.
   In the image, the `contracts` stage copies the parameters out of its BuildKit cache mount into its own output,
   and the build stage takes them from there: a CI runner restores the stage's layers from cache without running
@@ -481,17 +519,28 @@ already serves the holder's page). No account and no token.
   - **A 14-day cooldown** on npm, the contracts' npm and GitHub Actions is the two-week rule, enforced. Security
     updates are not delayed by it.
   - **`@midnight-ntwrk/compact-runtime` is never updated by Dependabot.** It must be the runtime of the pinned
-    compiler: the compiled contract calls `checkRuntimeVersion('0.16.0')` and refuses any other.
-  - **No Midnight major** (`@midnight-ntwrk/*`, `@midnightntwrk/*`): midnight-js 5 and wallet SDK 2 are ledger 9.
-    The Midnight packages move together in one group, as they must.
-  - **`@openzeppelin/compact-contracts` stays below 0.4**, which targets ledger 9.
-  - Ledger 9 is one deliberate move, a new contract generation: infra `docs/MIGRATIONS.md` M12.
+    compiler: the compiled contract calls `checkRuntimeVersion('0.21.0')` and refuses any other.
+  - **No Midnight major** (`@midnight-ntwrk/*`, `@midnightntwrk/*`): the next one is the next ledger. The Midnight
+    packages move together in one group, as they must.
+  - **`@openzeppelin/compact-contracts` stays below 0.5.**
+- **Ledger 9 moved on 2026-11-11** (infra `docs/MIGRATIONS.md` M12), as one support-matrix row: compactc 0.36.0,
+  compact-runtime 0.21.0, midnight-js 5.0.0, wallet SDK 2.0.0, `@midnightntwrk/zkir-v3` 3.2.0, OpenZeppelin 0.4.0, proof
+  server 9.0.0. Every one was 4 to 8 days old; the user granted the exception (*"Pengecualian sekarang"*), because no
+  ledger 8 package transacts on Preprod after its upgrade. The lockfile was resolved with
+  `--before=2026-11-06T01:00:00Z`, just after midnight-js 5.0.0, so nothing newer came with it.
+- **One copy of each protocol package.** `overrides` pins `@midnightntwrk/ledger-v9` 1.0.0,
+  `@midnightntwrk/onchain-runtime-v4` 4.0.0 and `@midnight-ntwrk/platform-js` 3.0.0, as Midnight's migration guide asks:
+  two copies of a WASM package refuse each other's objects. `@midnight-ntwrk/midnight-js-network-id` is gone.
+- **TypeScript 7.0.2 hangs on `indexerPublicDataProvider(queryURL, subscriptionURL)`**, the deprecated positional
+  overload: `tsc` ran for minutes at full CPU without a word (2026-11-11). The options form
+  `indexerPublicDataProvider({ queryURL, subscriptionURL })` checks in a second; use it, and the options form of
+  `httpClientProofProvider` too.
   - Base images and the toolchain's Postgres take no major; the toolchain's own image is built here, not
     pulled, so it is ignored. `@types/node` takes no major while the runtime is Node 26.
 - **Node 26.12.1 is the exception** to the two weeks: the user chose it for its security patch (2026-10-22). The
   wallet SDK documents Node 22.12+; the spike proved the proof bench and a wallet sync on 26, about 15% faster
   than on 22.
-- **The wallet SDK brings seven GPL-3.0 packages** (`@subsquid/*`, `@substrate/connect*`, `smoldot`). Three
+- **The wallet SDK brings GPL-3.0 packages** (`@subsquid/*`, `@substrate/connect*`, `smoldot`). Three
   Midnight WASM packages have no licence field. Running them on this server distributes nothing. Shipping them
   to browsers is SEAL-D9, still open.
 - **The Prisma CLI brings** Studio (`elkjs`, EPL-2.0), `mysql2` (whose `seq-queue` has no licence field) and a

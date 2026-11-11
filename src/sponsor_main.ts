@@ -1,4 +1,3 @@
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
 import { Registry } from "prom-client"
 
 import type { LoggerPort } from "./application/ports/logger.port.ts"
@@ -31,7 +30,6 @@ const service = "kinetix-seal-sponsor"
 const config = readSponsorConfig(process.env)
 
 redactOutput(sponsorSecrets(config))
-setNetworkId(config.midnight.networkId)
 
 const logger: LoggerPort = new JsonLogger(service, config.logLevel, (line) => {
   process.stdout.write(line)
@@ -99,7 +97,7 @@ stops.push(
   })
 )
 
-const keys = deriveWalletKeys(config.sponsorMnemonic)
+const keys = deriveWalletKeys(config.sponsorMnemonic, config.midnight.networkId)
 const stateFile = walletStateFile(config.walletStateDir, keys)
 const saved = await loadWalletState(stateFile)
 const restoreStarted = performance.now()
@@ -112,7 +110,7 @@ const facade = await startWalletFacade(config.midnight, config.blockfrostProject
 const restoreSeconds = (performance.now() - restoreStarted) / 1000
 
 wallet.started(new FacadeSponsorWallet(facade, stateFile))
-payer.started(new FacadeTransactionPayer(facade, keys))
+payer.started(new FacadeTransactionPayer(facade, keys.unshieldedKeystore))
 gauges.restored(restoreSeconds)
 logger.info({ message: "the sponsor wallet started", fields: { restore_seconds: Math.round(restoreSeconds) } })
 

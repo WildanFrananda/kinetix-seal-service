@@ -1,7 +1,6 @@
 import { fileURLToPath } from "node:url"
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider"
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider"
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider"
 import { Registry } from "prom-client"
 
@@ -67,7 +66,6 @@ const service = "kinetix-seal-service"
 const config = readServiceConfig(process.env)
 
 redactOutput(serviceSecrets(config))
-setNetworkId(config.midnight.networkId)
 
 const logger: LoggerPort = new JsonLogger(service, config.logLevel, (line) => {
   process.stdout.write(line)
@@ -99,13 +97,14 @@ const sponsor = new HttpsSponsorClient(
 
 const sponsorStatus = new RemoteSponsorStatus(sponsor, logger)
 const readiness = new Readiness(new PrismaDatabaseProbe(prisma), sponsorStatus)
+const midnightConfig = { networkId: config.midnight.networkId, ttlSeconds: 3600 }
 const zkConfig = new NodeZkConfigProvider<string>(credentialRegistryDirectory)
-const publicData = indexerPublicDataProvider(
-  withProjectId(config.midnight.indexerHttpUrl, config.blockfrostProjectId),
-  withProjectId(config.midnight.indexerWsUrl, config.blockfrostProjectId)
-)
+const publicData = indexerPublicDataProvider({
+  queryURL: withProjectId(config.midnight.indexerHttpUrl, config.blockfrostProjectId),
+  subscriptionURL: withProjectId(config.midnight.indexerWsUrl, config.blockfrostProjectId)
+})
 
-const proofs = httpClientProofProvider(config.midnight.proofServerUrl, zkConfig)
+const proofs = httpClientProofProvider({ url: config.midnight.proofServerUrl, zkConfigProvider: zkConfig })
 const generationStore = new PrismaRegistryGenerationStore(prisma)
 const credentialStore = new PrismaCredentialStore(prisma)
 const credentialMetrics = new PrometheusCredentialMetrics(registry)
@@ -117,6 +116,7 @@ const registryGenerations = new RegistryGenerations(
     zkConfig,
     blocks: new IndexerBlocks(config.midnight.indexerHttpUrl, config.blockfrostProjectId, config.midnightStepSeconds),
     issuerSecret: config.issuerSecret,
+    config: midnightConfig,
     networkStepSeconds: config.midnightStepSeconds
   }),
   generationStore,
@@ -132,6 +132,7 @@ const registryChain = new MidnightCredentialChain({
   proofs,
   zkConfig,
   issuerSecret: config.issuerSecret,
+  config: midnightConfig,
   networkStepSeconds: config.midnightStepSeconds
 })
 

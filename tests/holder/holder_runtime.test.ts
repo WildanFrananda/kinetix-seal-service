@@ -1,14 +1,12 @@
 import assert from "node:assert/strict"
 import { randomBytes } from "node:crypto"
 import { describe, it } from "node:test"
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
+import { Zkir } from "@midnightntwrk/zkir-v3"
 import { pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import HolderRuntime from "../../holder/src/holder_runtime.ts"
 import { fileAsset } from "./file_assets.ts"
 import { presentationRequest } from "./holder_presentations.ts"
 import { presentedCalls } from "./presented_calls.ts"
-
-setNetworkId("undeployed")
 
 describe("the holder runtime", () => {
   it("proves a present call on the registry from the holder's own secret and credential", async () => {
@@ -70,6 +68,6 @@ describe("the holder runtime", () => {
     await runtime.prepare()
 
     assert.equal(asked.filter((name) => name === "present.prover").length, 2)
-    assert.ok(asked.includes("bls_midnight_2p12"))
+    assert.ok(asked.includes(`bls_midnight_2p${Zkir.deserialize(await fileAsset("present.bzkir")).getK()}`))
   })
 })

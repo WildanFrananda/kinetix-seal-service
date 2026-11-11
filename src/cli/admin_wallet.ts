@@ -1,4 +1,3 @@
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
 import type { WalletFacade } from "@midnightntwrk/wallet-sdk"
 
 import type { LoggerPort } from "../application/ports/logger.port.ts"
@@ -18,13 +17,12 @@ async function withAdminWallet(
   const config = readSponsorConfig(process.env)
 
   redactOutput(sponsorSecrets(config))
-  setNetworkId(config.midnight.networkId)
 
   const logger = new JsonLogger(`kinetix-seal-${command}`, config.logLevel, (line) => {
     process.stdout.write(line)
   })
 
-  const keys = deriveWalletKeys(config.sponsorMnemonic)
+  const keys = deriveWalletKeys(config.sponsorMnemonic, config.midnight.networkId)
   const stateFile = walletStateFile(config.walletStateDir, keys)
   const wallet = await startWalletFacade(
     config.midnight,

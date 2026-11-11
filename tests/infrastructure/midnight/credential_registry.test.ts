@@ -3,16 +3,13 @@ import { randomBytes } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { describe, it } from "node:test"
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
-import { Zkir } from "@midnight-ntwrk/zkir-v2"
+import { Zkir } from "@midnightntwrk/zkir-v3"
 
 import { type Credential, type Predicate, pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import { credentialRegistryDirectory } from "../../../src/infrastructure/midnight/credential_registry_contract.ts"
 import type { HolderPrivateState } from "../../../src/types/holder_private_state.type.ts"
 import type { IssuerPrivateState } from "../../../src/types/issuer_private_state.type.ts"
 import InMemoryCredentialRegistry from "./in_memory_credential_registry.ts"
-
-setNetworkId("undeployed")
 
 const issueDay = 20_390n
 

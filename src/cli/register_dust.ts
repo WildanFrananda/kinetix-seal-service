@@ -23,7 +23,7 @@ await withAdminWallet("register-dust", async (wallet, keys, logger) => {
   const recipe = await wallet.registerNightUtxosForDustGeneration(
     unregistered,
     keys.unshieldedKeystore.getPublicKey(),
-    (payload) => keys.unshieldedKeystore.signData(payload)
+    keys.unshieldedKeystore.signDataAsync
   )
 
   const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe))
