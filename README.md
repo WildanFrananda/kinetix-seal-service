@@ -16,7 +16,7 @@ matching and review, and courier credentials: a courier asks, and seal issues a 
 | language | TypeScript 7.0.2 (the Go compiler), strict |
 | HTTP | Fastify 5.12.5 |
 | database | PostgreSQL 16 through Prisma ORM 7.10.0 and `@prisma/adapter-pg` |
-| Midnight | wallet SDK 1.2.0, midnight-js 4.1.1, Preprod through Blockfrost |
+| Midnight | ledger 9: compactc 0.36.0, wallet SDK 2.0.0, midnight-js 5.0.0, proof server 9.0.0, Preprod through Blockfrost |
 | tokens | jose 6.2.12, against identity's published keys |
 | metrics | prom-client 15.1.3 |
 | lint and format | Biome 2.5.15, and `scripts/check_layout.ts` (`@babel/parser` 8.0.7) for blank lines |

@@ -1,6 +1,6 @@
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { Zkir } from "@midnight-ntwrk/zkir-v2"
+import { Zkir } from "@midnightntwrk/zkir-v3"
 import { build } from "esbuild"
 
 import { bundledPackages, licenceRefusals, noticesOf } from "./bundle_licences.ts"
@@ -34,6 +34,7 @@ await mkdir(staging, { recursive: true })
 const result = await build({
   entryPoints: { holder: "holder/src/holder_main.ts" },
   bundle: true,
+  splitting: true,
   format: "esm",
   platform: "browser",
   target: "es2022",
@@ -60,6 +61,7 @@ const params = `bls_midnight_2p${Zkir.deserialize(ir).getK()}`
 await copyFile(join(contractDirectory, "keys", "present.prover"), join(staging, "present.prover"))
 await copyFile(join(contractDirectory, "keys", "present.verifier"), join(staging, "present.verifier"))
 await writeFile(join(staging, "present.bzkir"), ir)
+await copyFile(join(contractDirectory, "compiler", "contract-manifest.json"), join(staging, "contract-manifest.json"))
 await copyFile(join(paramsDirectory, params), join(staging, params))
 await writeFile(join(staging, "index.html"), page)
 await writeFile(join(staging, "THIRD_PARTY_NOTICES.txt"), await noticesOf(packages))

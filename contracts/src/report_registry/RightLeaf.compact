@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module RightLeaf {
+  import CompactStandardLibrary;
+
+  struct RightLeaf {
+    domain: Bytes<32>;
+    merchant: Bytes<32>;
+    window: Uint<32>;
+    order: Bytes<32>;
+    reporter: Field;
+  }
+
+  export { RightLeaf };
+}

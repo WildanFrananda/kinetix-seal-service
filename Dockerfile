@@ -9,8 +9,8 @@ RUN case "$BUILDARCH" in \
       amd64) triple=x86_64-unknown-linux-musl ;; \
       *) echo "unsupported architecture: $BUILDARCH" >&2; exit 1 ;; \
     esac \
- && zip="compactc_v0.31.1_${triple}.zip" \
- && wget -q -O "/tmp/$zip" "https://github.com/LFDT-Minokawa/compact/releases/download/compactc-v0.31.1/$zip" \
+ && zip="compactc_v0.36.0_${triple}.zip" \
+ && wget -q -O "/tmp/$zip" "https://github.com/LFDT-Minokawa/compact/releases/download/compactc-v0.36.0/$zip" \
  && cd /tmp \
  && grep " $zip\$" compactc.sha256 | sha256sum -c - \
  && mkdir /compactc \

@@ -1,9 +1,4 @@
-import {
-  type Binding,
-  type Proof,
-  type SignatureEnabled,
-  Transaction
-} from "@midnight-ntwrk/midnight-js-protocol/ledger"
+import { type Binding, type Proof, type SignatureEnabled, Transaction } from "@midnight-ntwrk/midnight-js-protocol/v9"
 
 function presentedCalls(transactionHex: string): Array<{ address: string; entryPoint: string }> {
   const transaction = Transaction.deserialize<SignatureEnabled, Proof, Binding>(

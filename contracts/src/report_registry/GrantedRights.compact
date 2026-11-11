@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module GrantedRights {
+  import CompactStandardLibrary;
+
+  ledger rights: HistoricMerkleTree<20, Bytes<32>>;
+
+  circuit _grant(leaf: Bytes<32>): [] {
+    rights.insertHash(disclose(leaf));
+  }
+
+  circuit assertGranted(path: MerkleTreePath<20, Bytes<32>>): [] {
+    assert(rights.checkRoot(disclose(merkleTreePathRootNoLeafHash<20>(path))), "the right was not granted");
+  }
+
+  export {
+    rights,
+    _grant,
+    assertGranted
+  };
+}

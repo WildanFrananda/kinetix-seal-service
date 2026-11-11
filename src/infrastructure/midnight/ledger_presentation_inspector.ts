@@ -1,9 +1,4 @@
-import {
-  type Binding,
-  type Proof,
-  type SignatureEnabled,
-  Transaction
-} from "@midnight-ntwrk/midnight-js-protocol/ledger"
+import { type Binding, type Proof, type SignatureEnabled, Transaction } from "@midnight-ntwrk/midnight-js-protocol/v9"
 
 import type { PresentationInspectorPort } from "../../application/ports/presentation_inspector.port.ts"
 import type { InspectedCall } from "../../types/inspected_call.type.ts"

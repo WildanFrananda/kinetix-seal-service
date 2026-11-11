@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto"
+import { ContractState } from "@midnight-ntwrk/compact-runtime"
 import {
-  type CallOptionsWithPrivateState,
   createUnprovenCallTxFromInitialStates,
-  getPublicStates
+  getPublicStates,
+  type Ledger9CallOptionsWithPrivateState
 } from "@midnight-ntwrk/midnight-js-contracts"
-import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js"
-import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/ledger"
+import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
+import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
 
 import { type Ledger, ledger, pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import type { CredentialChainPort } from "../../application/ports/credential_chain.port.ts"
@@ -104,7 +105,7 @@ class MidnightCredentialChain
       throw new Error(`the registry ${contractAddress} has no state`)
     }
 
-    return ledger(state.data)
+    return ledger(state.contractState.deserialize({ v9: ContractState }).data)
   }
 
   private async call<K extends RegistryCircuitId>(
@@ -113,7 +114,7 @@ class MidnightCredentialChain
     args: CompactContract.CircuitParameters<RegistryContract, K>,
     what: string
   ): Promise<RegistryReceipt> {
-    const { zkConfig, issuerSecret, publicData, networkStepSeconds } = this.dependencies
+    const { zkConfig, issuerSecret, config, publicData, networkStepSeconds } = this.dependencies
     const states = await withTimeout(
       getPublicStates(publicData, contractAddress),
       networkStepSeconds,
@@ -130,8 +131,9 @@ class MidnightCredentialChain
       initialContractState: states.contractState,
       initialZswapChainState: states.zswapChainState,
       ledgerParameters: states.ledgerParameters,
-      initialPrivateState: { role: "issuer", issuerSecret }
-    } as CallOptionsWithPrivateState<RegistryContract, K>
+      initialPrivateState: { role: "issuer", issuerSecret },
+      config
+    } as Ledger9CallOptionsWithPrivateState<RegistryContract, K>
 
     const call = await createUnprovenCallTxFromInitialStates(zkConfig, options, zswap.encryptionPublicKey)
     const confirmed = await submitSealTransaction(this.dependencies, call.private.unprovenTx, what)

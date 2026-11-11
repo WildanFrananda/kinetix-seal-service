@@ -1,13 +1,16 @@
-import type { ContractState } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime"
-import type { LedgerParameters, ZswapChainState } from "@midnight-ntwrk/midnight-js-protocol/ledger"
+import type {
+  SerializedContractState,
+  SerializedLedgerParameters,
+  SerializedZswapChainState
+} from "@midnight-ntwrk/midnight-js-types"
 
 type DecodedRegistrySnapshot = {
   generation: number
   networkId: string
   contractAddress: string
-  contractState: ContractState
-  zswapChainState: ZswapChainState
-  ledgerParameters: LedgerParameters
+  contractState: SerializedContractState<"v9">
+  zswapChainState: SerializedZswapChainState<"v9">
+  ledgerParameters: SerializedLedgerParameters<"v9">
 }
 
 export type { DecodedRegistrySnapshot }

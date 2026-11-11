@@ -1,17 +1,17 @@
 import { randomBytes } from "node:crypto"
 import {
-  type CallOptionsWithPrivateState,
   createUnprovenCallTxFromInitialStates,
-  createUnprovenDeployTxFromVerifierKeys
+  createUnprovenDeployTxFromVerifierKeys,
+  type Ledger9CallOptionsWithPrivateState
 } from "@midnight-ntwrk/midnight-js-contracts"
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider"
-import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js"
+import { LedgerParameters, ZswapChainState, ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
+import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
 import {
   ChargedState,
   type ContractState,
   sampleSigningKey
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime"
-import { LedgerParameters, ZswapChainState, ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/ledger"
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime"
 
 import {
   type Contract,
@@ -26,6 +26,7 @@ import {
 } from "../../../src/infrastructure/midnight/credential_registry_contract.ts"
 import type { CredentialRegistryPrivateState } from "../../../src/types/credential_registry_private_state.type.ts"
 import type { RegistrySnapshotWire } from "../../../src/types/registry_snapshot_wire.type.ts"
+import { decodedContractState, inMemoryCallStates, inMemoryConfig } from "./in_memory_states.ts"
 
 type Registry = Contract<CredentialRegistryPrivateState>
 type RegistryCircuit = CompactContract.ProvableCircuitId<Registry>
@@ -54,10 +55,14 @@ class InMemoryCredentialRegistry {
         signingKey: sampleSigningKey(),
         initialPrivateState: { role: "issuer", issuerSecret }
       },
-      zswap.encryptionPublicKey
+      zswap.encryptionPublicKey,
+      inMemoryConfig
     )
 
-    return new InMemoryCredentialRegistry(deployed.public.contractAddress, deployed.public.initialContractState)
+    return new InMemoryCredentialRegistry(
+      deployed.public.contractAddress,
+      decodedContractState(deployed.public.initialContractState)
+    )
   }
 
   ledger(): Ledger {
@@ -127,11 +132,10 @@ class InMemoryCredentialRegistry {
       contractAddress: this.address,
       args,
       coinPublicKey: this.zswap.coinPublicKey,
-      initialContractState: this.state,
-      initialZswapChainState: new ZswapChainState(),
-      ledgerParameters: LedgerParameters.initialParameters(),
-      initialPrivateState
-    } as CallOptionsWithPrivateState<Registry, K>
+      ...inMemoryCallStates(this.state),
+      initialPrivateState,
+      config: inMemoryConfig
+    } as Ledger9CallOptionsWithPrivateState<Registry, K>
 
     const called = await createUnprovenCallTxFromInitialStates(zkConfig, options, this.zswap.encryptionPublicKey)
 

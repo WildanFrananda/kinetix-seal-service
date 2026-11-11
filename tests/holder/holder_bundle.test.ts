@@ -3,13 +3,10 @@ import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { describe, it } from "node:test"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
 
 import { pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import { presentationRequest } from "./holder_presentations.ts"
 import { presentedCalls } from "./presented_calls.ts"
-
-setNetworkId("undeployed")
 
 const holderRoot = "dist/holder-bundle"
 const answers = new Map<string, Record<string, string>>()

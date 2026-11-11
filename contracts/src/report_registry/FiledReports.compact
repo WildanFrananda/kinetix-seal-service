@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module FiledReports {
+  import CompactStandardLibrary;
+  import "FiledReport";
+
+  ledger reports: Map<Bytes<32>, FiledReport>;
+
+  circuit _fileReport(nullifier: Bytes<32>, report: FiledReport): [] {
+    assert(!reports.member(disclose(nullifier)), "the order was already reported");
+    reports.insert(disclose(nullifier), disclose(report));
+  }
+
+  export {
+    reports,
+    _fileReport
+  };
+}

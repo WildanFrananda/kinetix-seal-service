@@ -1,4 +1,4 @@
-import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/ledger"
+import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/v9"
 import { ttlOneHour } from "@midnight-ntwrk/midnight-js-utils"
 import * as Rx from "rxjs"
 
@@ -41,11 +41,10 @@ await withAdminWallet("split-night", async (wallet, keys, logger) => {
         }))
       }
     ],
-    { shieldedSecretKeys: keys.shieldedSecretKeys, dustSecretKey: keys.dustSecretKey },
     { ttl: ttlOneHour() }
   )
 
-  const signed = await wallet.signRecipe(recipe, (payload) => keys.unshieldedKeystore.signData(payload))
+  const signed = await wallet.signRecipe(recipe, keys.unshieldedKeystore.signDataAsync)
   const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(signed))
 
   logger.info({ message: "split submitted", fields: { transaction: txId, outputs, share_star: share } })

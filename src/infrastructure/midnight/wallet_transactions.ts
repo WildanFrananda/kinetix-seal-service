@@ -1,34 +1,28 @@
-import type { Binding, Proof, SignatureEnabled, Transaction } from "@midnight-ntwrk/midnight-js-protocol/ledger"
-import type { UnboundTransaction } from "@midnight-ntwrk/midnight-js-types"
 import { ttlOneHour } from "@midnight-ntwrk/midnight-js-utils"
-import type { WalletFacade } from "@midnightntwrk/wallet-sdk"
+import type { FinalizedTx, UnboundTx, UnshieldedKeystore, WalletFacade } from "@midnightntwrk/wallet-sdk"
 
-import type { WalletKeys } from "../../types/wallet_keys.type.ts"
-
-async function payAndSubmit(wallet: WalletFacade, keys: WalletKeys, transaction: UnboundTransaction): Promise<string> {
-  const recipe = await wallet.balanceUnboundTransaction(
-    transaction,
-    { shieldedSecretKeys: keys.shieldedSecretKeys, dustSecretKey: keys.dustSecretKey },
-    { ttl: ttlOneHour() }
-  )
-
-  const signed = await wallet.signRecipe(recipe, (payload) => keys.unshieldedKeystore.signData(payload))
+async function payAndSubmit(
+  wallet: WalletFacade,
+  keystore: UnshieldedKeystore,
+  transaction: UnboundTx
+): Promise<string> {
+  const recipe = await wallet.balanceUnboundTransaction(transaction, { ttl: ttlOneHour() })
+  const signed = await wallet.signRecipe(recipe, keystore.signDataAsync)
 
   return wallet.submitTransaction(await wallet.finalizeRecipe(signed))
 }
 
 async function sponsorAndSubmit(
   wallet: WalletFacade,
-  keys: WalletKeys,
-  transaction: Transaction<SignatureEnabled, Proof, Binding>
+  keystore: UnshieldedKeystore,
+  transaction: FinalizedTx
 ): Promise<string> {
-  const recipe = await wallet.balanceFinalizedTransaction(
-    transaction,
-    { shieldedSecretKeys: keys.shieldedSecretKeys, dustSecretKey: keys.dustSecretKey },
-    { ttl: ttlOneHour(), tokenKindsToBalance: ["dust"] }
-  )
+  const recipe = await wallet.balanceFinalizedTransaction(transaction, {
+    ttl: ttlOneHour(),
+    tokenKindsToBalance: ["dust"]
+  })
 
-  const signed = await wallet.signRecipe(recipe, (payload) => keys.unshieldedKeystore.signData(payload))
+  const signed = await wallet.signRecipe(recipe, keystore.signDataAsync)
 
   return wallet.submitTransaction(await wallet.finalizeRecipe(signed))
 }

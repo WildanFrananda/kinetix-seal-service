@@ -1,5 +1,3 @@
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
-
 import SettingReader from "../infrastructure/config/setting_reader.ts"
 import { deriveWalletKeys } from "../infrastructure/midnight/wallet_keys.ts"
 import { redactOutput } from "../infrastructure/observability/redacting_output.ts"
@@ -10,6 +8,5 @@ const mnemonic = read.text("KINETIX_SEAL_SPONSOR_MNEMONIC").toLowerCase().split(
 
 read.verify()
 redactOutput([{ value: mnemonic, placeholder: "<mnemonic>" }])
-setNetworkId(networkId)
 
-process.stdout.write(`${deriveWalletKeys(mnemonic).unshieldedKeystore.getBech32Address()}\n`)
+process.stdout.write(`${deriveWalletKeys(mnemonic, networkId).unshieldedKeystore.getBech32Address()}\n`)

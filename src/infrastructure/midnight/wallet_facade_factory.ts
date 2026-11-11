@@ -1,5 +1,4 @@
-import { getNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
-import * as ledger from "@midnight-ntwrk/midnight-js-protocol/ledger"
+import * as ledger from "@midnight-ntwrk/midnight-js-protocol/v9"
 import {
   DustWallet,
   NoOpTransactionHistoryStorage,
@@ -20,11 +19,11 @@ async function startWalletFacade(
   keys: WalletKeys,
   saved: SavedWalletState | undefined
 ): Promise<WalletFacade> {
-  const { shieldedSecretKeys, dustSecretKey, unshieldedKeystore } = keys
+  const { seeds, unshieldedKeystore } = keys
 
   const wallet = await WalletFacade.init({
     configuration: {
-      networkId: getNetworkId(),
+      networkId: endpoints.networkId,
       indexerClientConnection: {
         indexerHttpUrl: withProjectId(endpoints.indexerHttpUrl, projectId),
         indexerWsUrl: withProjectId(endpoints.indexerWsUrl, projectId)
@@ -32,6 +31,7 @@ async function startWalletFacade(
       provingServerUrl: new URL(endpoints.proofServerUrl),
       relayURL: new URL(withProjectId(endpoints.nodeWsUrl, projectId)),
       txHistoryStorage: new NoOpTransactionHistoryStorage(),
+      skipLedgerV8DustHistory: true,
       costParameters: {
         additionalFeeOverhead: 1_000n,
         feeBlocksMargin: 5
@@ -40,7 +40,7 @@ async function startWalletFacade(
     shielded: (configuration) =>
       saved
         ? ShieldedWallet(configuration).restore(saved.shielded)
-        : ShieldedWallet(configuration).startWithSecretKeys(shieldedSecretKeys),
+        : ShieldedWallet(configuration).startWithSeed(seeds.shielded),
     unshielded: (configuration) =>
       saved
         ? UnshieldedWallet(configuration).restore(saved.unshielded)
@@ -48,10 +48,10 @@ async function startWalletFacade(
     dust: (configuration) =>
       saved
         ? DustWallet(configuration).restore(saved.dust)
-        : DustWallet(configuration).startWithSecretKey(dustSecretKey, ledger.LedgerParameters.initialParameters().dust)
+        : DustWallet(configuration).startWithSeed(seeds.dust, ledger.LedgerParameters.initialParameters().dust)
   })
 
-  await wallet.start(shieldedSecretKeys, dustSecretKey)
+  await wallet.start(seeds)
 
   return wallet
 }

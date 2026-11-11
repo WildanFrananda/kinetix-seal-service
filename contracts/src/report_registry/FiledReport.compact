@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: MIT
+pragma language_version >= 0.23.0;
+
+module FiledReport {
+  import CompactStandardLibrary;
+
+  struct FiledReport {
+    merchant: Bytes<32>;
+    window: Uint<32>;
+    digest: Bytes<32>;
+  }
+
+  export { FiledReport };
+}

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { createUnprovenDeployTxFromVerifierKeys } from "@midnight-ntwrk/midnight-js-contracts"
-import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/ledger"
+import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
 
 import { pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import type { RegistryChainPort } from "../../application/ports/registry_chain.port.ts"
@@ -24,7 +24,7 @@ class MidnightRegistryChain implements RegistryChainPort {
   }
 
   async prepareDeploy(generation: number): Promise<PreparedDeploy> {
-    const { zkConfig, issuerSecret } = this.dependencies
+    const { zkConfig, issuerSecret, config } = this.dependencies
     const zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
     const deploy = await createUnprovenDeployTxFromVerifierKeys(
       zkConfig,
@@ -35,7 +35,8 @@ class MidnightRegistryChain implements RegistryChainPort {
         signingKey: maintenanceSigningKey(issuerSecret, generation),
         initialPrivateState: { role: "issuer", issuerSecret }
       },
-      zswap.encryptionPublicKey
+      zswap.encryptionPublicKey,
+      config
     )
 
     const dependencies = this.dependencies

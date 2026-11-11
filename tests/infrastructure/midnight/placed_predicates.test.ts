@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import { randomBytes } from "node:crypto"
 import { describe, it } from "node:test"
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id"
 
 import { pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import { hexOf } from "../../../src/domain/hex.ts"
@@ -13,8 +12,6 @@ import type { IssuerPrivateState } from "../../../src/types/issuer_private_state
 import { credentialRecord } from "../../fakes/credential_record.ts"
 import { predicateTemplate } from "../../fakes/predicate_template.ts"
 import InMemoryCredentialRegistry from "./in_memory_credential_registry.ts"
-
-setNetworkId("undeployed")
 
 const issuer: IssuerPrivateState = { role: "issuer", issuerSecret: randomBytes(32) }
 const [currentRow, previousRow] = predicateRowsOf(
