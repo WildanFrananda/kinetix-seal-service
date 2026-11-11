@@ -29,7 +29,7 @@ RUN tarball="step_linux_0.30.2_${TARGETARCH}.tar.gz" \
  && tar -xzf "/tmp/$tarball" -C /tmp \
  && install -m 0755 /tmp/step_0.30.2/bin/step /step
 
-FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
 
 COPY --from=compactc /compactc /opt/compactc
 COPY --from=compactc /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
