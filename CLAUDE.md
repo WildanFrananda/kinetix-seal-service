@@ -224,6 +224,27 @@ contracts/
 - **The service deploys its own registry.** `RegistryGenerations` (`src/application/`) reconciles the
   `registry_generations` table with the chain every `KINETIX_SEAL_REGISTRY_CHECK_SECONDS`, once the sponsor is
   past `syncing`. The rule is a pure function, `src/domain/registry_generation_decision.ts`.
+- **Two registries, one table (S3b, 2026-11-12).** Rows carry `registry`, `credential` or `report`, and the key is
+  `(registry, generation)`, so each registry numbers its generations apart. `main.ts` runs one `RegistryGenerations` per
+  registry, the credential's first in the same tick, each over a `PrismaRegistryGenerationStore` scoped to its registry
+  and its own chain adapter: `MidnightRegistryChain` and `MidnightReportRegistryChain`, which share
+  `observeRegistryAnchor`. Each has its own ZK config and proof provider, and its own build digest, so a change to one
+  contract renews only its own generation. Their logs name the registry; `kinetix_seal_registry_generation` and
+  `kinetix_seal_registry_deploys_total` carry a `registry` label, both seeded at zero. Every service that reads "the
+  active generation" (issuer, keeper, snapshot, relay, statuses, the credential routes) is handed the credential
+  store. The migration labels every existing row `credential`. Rights and filed reports are carried into a new report
+  generation by the queues that make them (S3c's grants, S3d's `seedReport`), as the credential issuer re-issues: a
+  generation is only the contract, and its contents are each feature's.
+- **A rollback below S3b once a report generation exists** is self-healing, not clean. The older build reads every
+  unretired row as its own and takes the lowest active one, so for up to one registry check it mistakes the report
+  registry for the credential registry; its calls to it fail and are retried. That check sees the report registry's
+  digest, retires it as `contract_rebuilt` and tries to deploy a credential generation, which fails, because the older
+  build writes no `registry` and the column has no default: on purpose, since a default would let it deploy a second
+  active credential generation beside the live one. The check after finds the live credential generation alone. The next
+  forward deploy deploys the report registry's next generation.
+- **The maintenance key is per registry.** `maintenanceSigningKey(issuerSecret, registry, generation)` hashes a domain
+  per registry: `kinetix:seal:maintenance` for the credential registry, unchanged so its live generation stays
+  maintainable (a test pins it), and `kinetix:seal:report:maintenance` for the report registry.
 - **The sponsor wallet pays** for every transaction seal makes itself, through the proof server
   (`MidnightRegistryChain`). There is no second wallet.
 - **A generation is anchored to the block its deploy landed in.** A different hash at that height, or no block
@@ -244,14 +265,15 @@ contracts/
   a number, and generation 49 followed generation 2.
 - **A drill retires the active generation on purpose.** A healthy chain never replaces a generation, so the plan's
   reset drill (S1's exit) has its own command, `node dist/src/cli/retire_registry.js`, which reads only
-  `KINETIX_SEAL_DATABASE_URL` and `KINETIX_SEAL_DRILL_GENERATION`, the generation the operator means to retire. It
+  `KINETIX_SEAL_DATABASE_URL`, `KINETIX_SEAL_DRILL_REGISTRY` (`credential` or `report`) and
+  `KINETIX_SEAL_DRILL_GENERATION`, the registry and generation the operator means to retire. It
   writes one retirement, reason `drill`, through `RegistryDrill`, and refuses a generation that is not the active
   one, a moment with none active (a deploy in flight is left alone), and any network but `preprod`, `preview` and
   `undeployed`: on mainnet a new generation costs real fees and is the owner's decision, not a drill. Everything
   else is the running service's, as after a reset: its next check deploys the next generation, `CredentialIssuer`
   re-issues each courier's current credential there, and `PredicateKeeper` places the live templates' rows. It
   starts no wallet, so it runs with the service up:
-  `docker compose run --rm --no-deps -e KINETIX_SEAL_DRILL_GENERATION=<n> kinetix-seal-service node dist/src/cli/retire_registry.js`.
+  `docker compose run --rm --no-deps -e KINETIX_SEAL_DRILL_REGISTRY=credential -e KINETIX_SEAL_DRILL_GENERATION=<n> kinetix-seal-service node dist/src/cli/retire_registry.js`.
 - **The issuer secret** (`KINETIX_SEAL_ISSUER_SECRET`, 32 bytes of lowercase hex, in SOPS, one per environment)
   is redacted from every output. The maintenance authority's signing key is derived from it and the generation
   number, so nothing stores it: every change is a new generation anyway.
@@ -559,4 +581,7 @@ already serves the holder's page). No account and no token.
 ## Not built yet
 
 - A gRPC server of seal's own: nothing calls seal over the mesh yet.
-- S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions, S3 anonymous reports.
+- S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions.
+- S3 beyond its registry: the report registry contract (S3a, `contracts/src/report_registry/`) and its generations
+  (S3b) exist; reporter keys and rights (S3c), the report route (S3d), cases (S3e), the courier app (S3f) and the lab
+  run (S3g) do not (infra `docs/SEAL-SERVICE.md` §9 and §11).

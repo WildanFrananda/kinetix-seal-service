@@ -9,9 +9,9 @@ import type { DeployReceipt } from "../../types/deploy_receipt.type.ts"
 import type { MidnightRegistryChainDependencies } from "../../types/midnight_registry_chain_dependencies.type.ts"
 import type { PreparedDeploy } from "../../types/prepared_deploy.type.ts"
 import type { RegistryGeneration } from "../../types/registry_generation.type.ts"
-import { withTimeout } from "../scheduling/with_timeout.ts"
 import { compileCredentialRegistry } from "./credential_registry_contract.ts"
 import { maintenanceSigningKey } from "./maintenance_signing_key.ts"
+import { observeRegistryAnchor } from "./observe_registry_anchor.ts"
 import { submitSealTransaction } from "./submit_seal_transaction.ts"
 
 const compiledContract = compileCredentialRegistry()
@@ -32,7 +32,7 @@ class MidnightRegistryChain implements RegistryChainPort {
       {
         compiledContract,
         args: [pureCircuits.issuerPublicKey(issuerSecret)],
-        signingKey: maintenanceSigningKey(issuerSecret, generation),
+        signingKey: maintenanceSigningKey(issuerSecret, "credential", generation),
         initialPrivateState: { role: "issuer", issuerSecret }
       },
       zswap.encryptionPublicKey,
@@ -52,22 +52,7 @@ class MidnightRegistryChain implements RegistryChainPort {
   async observeAnchor(generation: RegistryGeneration): Promise<AnchorObservation> {
     const { blocks, publicData, networkStepSeconds } = this.dependencies
 
-    if (generation.anchorHeight === undefined || generation.anchorHash === undefined) {
-      return "unknown"
-    }
-
-    const hash = await blocks.hashAt(generation.anchorHeight)
-
-    if (hash !== undefined) {
-      return hash === generation.anchorHash ? "unchanged" : "replaced"
-    }
-
-    const [tip, state] = await Promise.all([
-      blocks.tipHeight(),
-      withTimeout(publicData.queryContractState(generation.contractAddress), networkStepSeconds, "reading the registry")
-    ])
-
-    return tip < generation.anchorHeight && state === null ? "replaced" : "unknown"
+    return observeRegistryAnchor(blocks, publicData, networkStepSeconds, generation)
   }
 }
 

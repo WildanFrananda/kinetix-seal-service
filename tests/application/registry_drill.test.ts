@@ -53,6 +53,7 @@ describe("a registry drill", () => {
     const store = new FakeRegistryGenerationStore([registryGeneration({ generation: 1 })])
     const chain = new FakeRegistryChain()
     const generations = new RegistryGenerations(
+      "credential",
       chain,
       store,
       new RecordingRegistryGauges(),

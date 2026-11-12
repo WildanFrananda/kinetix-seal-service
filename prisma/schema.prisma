@@ -22,7 +22,8 @@ model SponsorEvent {
 }
 
 model RegistryGeneration {
-  generation      Int       @id
+  registry        String    @db.VarChar(16)
+  generation      Int
   contractAddress String    @unique @map("contract_address") @db.VarChar(128)
   networkId       String    @map("network_id") @db.VarChar(32)
   buildDigest     String    @map("build_digest") @db.Char(64)
@@ -35,7 +36,8 @@ model RegistryGeneration {
   activatedAt     DateTime? @map("activated_at") @db.Timestamptz(6)
   retiredAt       DateTime? @map("retired_at") @db.Timestamptz(6)
 
-  @@index([status])
+  @@id([registry, generation])
+  @@index([registry, status])
   @@map("registry_generations")
 }
 

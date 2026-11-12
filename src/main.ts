@@ -38,6 +38,8 @@ import IndexerBlocks from "./infrastructure/midnight/indexer_blocks.ts"
 import LedgerPresentationInspector from "./infrastructure/midnight/ledger_presentation_inspector.ts"
 import MidnightCredentialChain from "./infrastructure/midnight/midnight_credential_chain.adapter.ts"
 import MidnightRegistryChain from "./infrastructure/midnight/midnight_registry_chain.adapter.ts"
+import MidnightReportRegistryChain from "./infrastructure/midnight/midnight_report_registry_chain.adapter.ts"
+import { reportRegistryDirectory } from "./infrastructure/midnight/report_registry_contract.ts"
 import { serviceSecrets } from "./infrastructure/midnight/seal_secrets.ts"
 import { estateMetrics } from "./infrastructure/observability/estate_metrics.ts"
 import JsonLogger from "./infrastructure/observability/json_logger.ts"
@@ -105,25 +107,49 @@ const publicData = indexerPublicDataProvider({
 })
 
 const proofs = httpClientProofProvider({ url: config.midnight.proofServerUrl, zkConfigProvider: zkConfig })
-const generationStore = new PrismaRegistryGenerationStore(prisma)
+const reportZkConfig = new NodeZkConfigProvider<string>(reportRegistryDirectory)
+const reportProofs = httpClientProofProvider({ url: config.midnight.proofServerUrl, zkConfigProvider: reportZkConfig })
+const blocks = new IndexerBlocks(config.midnight.indexerHttpUrl, config.blockfrostProjectId, config.midnightStepSeconds)
+const generationStore = new PrismaRegistryGenerationStore(prisma, "credential")
+const reportGenerationStore = new PrismaRegistryGenerationStore(prisma, "report")
 const credentialStore = new PrismaCredentialStore(prisma)
 const credentialMetrics = new PrometheusCredentialMetrics(registry)
 const registryGenerations = new RegistryGenerations(
+  "credential",
   new MidnightRegistryChain({
     payer: sponsor,
     publicData,
     proofs,
     zkConfig,
-    blocks: new IndexerBlocks(config.midnight.indexerHttpUrl, config.blockfrostProjectId, config.midnightStepSeconds),
+    blocks,
     issuerSecret: config.issuerSecret,
     config: midnightConfig,
     networkStepSeconds: config.midnightStepSeconds
   }),
   generationStore,
-  registryGauges,
+  registryGauges.of("credential"),
   logger,
   config.midnight.networkId,
   await contractBuildDigest(credentialRegistryDirectory)
+)
+
+const reportRegistryGenerations = new RegistryGenerations(
+  "report",
+  new MidnightReportRegistryChain({
+    payer: sponsor,
+    publicData,
+    proofs: reportProofs,
+    zkConfig: reportZkConfig,
+    blocks,
+    issuerSecret: config.issuerSecret,
+    config: midnightConfig,
+    networkStepSeconds: config.midnightStepSeconds
+  }),
+  reportGenerationStore,
+  registryGauges.of("report"),
+  logger,
+  config.midnight.networkId,
+  await contractBuildDigest(reportRegistryDirectory)
 )
 
 const registryChain = new MidnightCredentialChain({
@@ -272,6 +298,10 @@ stops.push(
 
     await registryGenerations.reconcile().catch((error: unknown) => {
       logger.error({ message: "the credential registry could not be reconciled" }, error)
+    })
+
+    await reportRegistryGenerations.reconcile().catch((error: unknown) => {
+      logger.error({ message: "the report registry could not be reconciled" }, error)
     })
   })
 )
