@@ -1,3 +1,4 @@
+import NothingSubmitted from "../domain/nothing_submitted.ts"
 import { confirmedAnchor, decideRegistryGeneration } from "../domain/registry_generation_decision.ts"
 import type { AnchorObservation } from "../types/anchor_observation.type.ts"
 import type { RegistryGeneration } from "../types/registry_generation.type.ts"
@@ -124,6 +125,17 @@ class RegistryGenerations {
       })
     } catch (error) {
       this.gauges.deployed("failed")
+
+      if (error instanceof NothingSubmitted) {
+        await this.store.forgetDeploying(generation)
+        this.logger.error(
+          { message: "the registry generation was not deployed and nothing was submitted", fields: { generation } },
+          error
+        )
+
+        return
+      }
+
       this.logger.error({ message: "the registry generation could not be deployed", fields: { generation } }, error)
     }
   }

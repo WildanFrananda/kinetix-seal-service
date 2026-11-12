@@ -58,6 +58,10 @@ class PrismaRegistryGenerationStore implements RegistryGenerationStorePort {
     })
   }
 
+  async forgetDeploying(generation: number): Promise<void> {
+    await this.prisma.registryGeneration.deleteMany({ where: { generation, status: "deploying" } })
+  }
+
   async activate(generation: number, receipt: DeployReceipt): Promise<void> {
     const updated = await this.prisma.registryGeneration.updateMany({
       where: { generation, status: "deploying" },

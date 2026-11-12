@@ -1,6 +1,7 @@
 import type { ProofProvider } from "@midnight-ntwrk/midnight-js-types"
 import { SucceedEntirely } from "@midnight-ntwrk/midnight-js-types"
 
+import NothingSubmitted from "../../domain/nothing_submitted.ts"
 import type { ConfirmedTransaction } from "../../types/confirmed_transaction.type.ts"
 import type { SealTransactionDependencies } from "../../types/seal_transaction_dependencies.type.ts"
 import { withTimeout } from "../scheduling/with_timeout.ts"
@@ -11,7 +12,14 @@ async function submitSealTransaction(
   what: string
 ): Promise<ConfirmedTransaction> {
   const { payer, proofs, publicData, networkStepSeconds } = dependencies
-  const proven = await withTimeout(proofs.proveTx(transaction), networkStepSeconds, `proving ${what}`)
+  const proven = await withTimeout(proofs.proveTx(transaction), networkStepSeconds, `proving ${what}`).catch(
+    (error: unknown) => {
+      throw new NothingSubmitted(`proving ${what} failed: ${error instanceof Error ? error.message : String(error)}`, {
+        cause: error
+      })
+    }
+  )
+
   const txId = await withTimeout(payer.pay(proven.serialize()), networkStepSeconds, `paying for ${what}`)
   const data = await withTimeout(publicData.watchForTxData(txId), networkStepSeconds, `confirming ${what}`)
 

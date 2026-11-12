@@ -23,6 +23,14 @@ class FakeRegistryGenerationStore implements RegistryGenerationStorePort {
     this.rows.push({ ...generation })
   }
 
+  async forgetDeploying(generation: number): Promise<void> {
+    const index = this.rows.findIndex((row) => row.generation === generation && row.status === "deploying")
+
+    if (index !== -1) {
+      this.rows.splice(index, 1)
+    }
+  }
+
   async activate(generation: number, receipt: DeployReceipt): Promise<void> {
     const row = this.rows.find((candidate) => candidate.generation === generation && candidate.status === "deploying")
 

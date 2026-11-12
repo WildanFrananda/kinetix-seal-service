@@ -5,6 +5,7 @@ import AnswerFrames from "./answer_frames.ts"
 import CameraScanner from "./camera_scanner.ts"
 import IssuedRequests from "./issued_requests.ts"
 import { linkAnswerOf } from "./link_answer.ts"
+import { minimumLinesOf } from "./minimum_lines.ts"
 import { choiceWithRow, predicateMenuOf } from "./predicate_menu.ts"
 import { requestCode } from "./presentation_request.ts"
 import { qrMatrix } from "./qr_matrix.ts"
@@ -34,12 +35,7 @@ function show(...children: Array<Node | string>): void {
 function describe(choice: PredicateChoice): HTMLElement {
   const list = element("ul", undefined, "minimums")
 
-  list.append(
-    element("li", `At least ${choice.deliveries} deliveries`),
-    element("li", `A rating of at least ${(choice.ratingHundredths / 100).toFixed(2)}`),
-    element("li", `Active for at least ${choice.daysActive} days`),
-    element("li", `Numbers as of ${choice.issuedSince} or later`)
-  )
+  list.append(...minimumLinesOf(choice).map((line) => element("li", line)))
 
   return list
 }

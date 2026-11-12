@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import RegistryGenerations from "../../src/application/registry_generations.service.ts"
+import NothingSubmitted from "../../src/domain/nothing_submitted.ts"
 import type { RegistryGeneration } from "../../src/types/registry_generation.type.ts"
 import FakeRegistryChain from "../fakes/fake_registry_chain.ts"
 import FakeRegistryGenerationStore from "../fakes/fake_registry_generation_store.ts"
@@ -90,6 +91,33 @@ describe("the registry generations", () => {
 
     assert.deepEqual(store.retirements, [{ generation: 1, reason: "interrupted" }])
     assert.equal(store.statusOf(2), "active")
+  })
+
+  it("uses the number again when the deploy was refused before anything was submitted", async () => {
+    const { chain, store, gauges, logger, generations } = generationsWith([
+      registryGeneration({ generation: 2, buildDigest: "a".repeat(64) })
+    ])
+
+    chain.submitFails = new NothingSubmitted(
+      "the sponsor answered 422: the sponsor refused the spend before submitting it: Insufficient Funds: could not balance dust"
+    )
+
+    await generations.reconcile()
+    await generations.reconcile()
+
+    assert.equal(store.statusOf(3), undefined)
+    assert.deepEqual(store.retirements, [{ generation: 2, reason: "contract_rebuilt" }])
+    assert.deepEqual(gauges.deploys, ["failed", "failed"])
+    assert.ok(
+      logger.lines.some((line) => line.message === "the registry generation was not deployed and nothing was submitted")
+    )
+
+    chain.submitFails = undefined
+    await generations.reconcile()
+
+    assert.deepEqual(chain.prepared, [3, 3, 3])
+    assert.equal(store.statusOf(3), "active")
+    assert.deepEqual(store.retirements, [{ generation: 2, reason: "contract_rebuilt" }])
   })
 
   it("runs one reconciliation at a time", async () => {
