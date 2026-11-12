@@ -74,6 +74,20 @@ describe("registry generations in Postgres", () => {
     assert.equal(row?.retiredReason, "interrupted")
   })
 
+  it("forgets a deploy that was never submitted, so its number is used again, and never an active one", async () => {
+    await store.recordDeploying(deploying)
+    await store.forgetDeploying(1)
+
+    assert.deepEqual(await store.unretired(), [])
+    assert.equal(await store.highestGeneration(), 0)
+
+    await store.recordDeploying(deploying)
+    await store.activate(1, { txId: "00ff", blockHeight: 2, blockHash: "d".repeat(64) })
+    await store.forgetDeploying(1)
+
+    assert.equal((await store.unretired())[0]?.status, "active")
+  })
+
   it("refuses a second generation at the same contract address", async () => {
     await store.recordDeploying(deploying)
 

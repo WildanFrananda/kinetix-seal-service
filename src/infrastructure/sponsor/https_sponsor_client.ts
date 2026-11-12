@@ -3,12 +3,14 @@ import type { PeerCertificate } from "node:tls"
 
 import type { SponsorStateSourcePort } from "../../application/ports/sponsor_state_source.port.ts"
 import type { TransactionPayerPort } from "../../application/ports/transaction_payer.port.ts"
+import NothingSubmitted from "../../domain/nothing_submitted.ts"
 import type { MeshIdentity } from "../../types/mesh_identity.type.ts"
 import type { SponsorState } from "../../types/sponsor_state.type.ts"
 import { serviceOfCertificate } from "../mesh/spiffe.ts"
 import { fromWireState } from "./sponsor_state_wire.ts"
 
 const server = "seal"
+const declinedStatuses: readonly number[] = [400, 403, 404, 413, 422, 503]
 
 class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort {
   private readonly base: URL
@@ -92,11 +94,10 @@ class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort
 
             if (response.statusCode !== 200) {
               const message = (parsed as { message?: unknown } | null)?.message
+              const answer = `the sponsor answered ${response.statusCode}: ${typeof message === "string" ? message : text}`
 
               reject(
-                new Error(
-                  `the sponsor answered ${response.statusCode}: ${typeof message === "string" ? message : text}`
-                )
+                declinedStatuses.includes(response.statusCode ?? 0) ? new NothingSubmitted(answer) : new Error(answer)
               )
 
               return
@@ -111,7 +112,14 @@ class HttpsSponsorClient implements SponsorStateSourcePort, TransactionPayerPort
         outgoing.destroy(new Error(`the sponsor did not answer ${method} ${path} within ${timeoutSeconds} s`))
       })
 
-      outgoing.on("error", reject)
+      outgoing.on("error", (error: NodeJS.ErrnoException) => {
+        reject(
+          error.code === "ECONNREFUSED"
+            ? new NothingSubmitted(`the sponsor refused the connection for ${method} ${path}`, { cause: error })
+            : error
+        )
+      })
+
       outgoing.end(payload)
     })
   }

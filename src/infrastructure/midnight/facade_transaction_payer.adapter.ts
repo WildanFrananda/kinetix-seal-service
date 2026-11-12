@@ -30,11 +30,11 @@ class FacadeTransactionPayer implements TransactionPayerPort {
   }
 
   private async payNow(unboundTransaction: Uint8Array): Promise<string> {
-    return payAndSubmit(this.wallet, this.keystore, this.wallet.adoptTransaction(unboundTransaction, "Unbound"))
+    return payAndSubmit(this.wallet, this.keystore, unboundTransaction)
   }
 
   private async sponsorNow(boundTransaction: Uint8Array): Promise<string> {
-    return sponsorAndSubmit(this.wallet, this.keystore, this.wallet.adoptTransaction(boundTransaction, "Finalized"))
+    return sponsorAndSubmit(this.wallet, this.keystore, boundTransaction)
   }
 }
 

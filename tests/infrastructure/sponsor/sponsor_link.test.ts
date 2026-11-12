@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net"
 import { after, describe, it } from "node:test"
 import type { FastifyInstance } from "fastify"
 
+import NothingSubmitted from "../../../src/domain/nothing_submitted.ts"
 import SponsorUnavailable from "../../../src/domain/sponsor_unavailable.ts"
 import HttpsSponsorClient from "../../../src/infrastructure/sponsor/https_sponsor_client.ts"
 import { buildSponsorApi } from "../../../src/infrastructure/sponsor/sponsor_api.ts"
@@ -120,6 +121,53 @@ describe("the link between seal and its sponsor", () => {
       clientAs("seal", sponsor.url).pay(Uint8Array.from([1])),
       /503: the sponsor wallet has not started/
     )
+  })
+
+  it("tells a spend refused before it was submitted from one whose fate is unknown", async () => {
+    const sponsor = await sponsorAs("seal")
+    const client = clientAs("seal", sponsor.url)
+
+    sponsor.payer.failure = new NothingSubmitted(
+      "the sponsor refused the spend before submitting it: Insufficient Funds: could not balance dust"
+    )
+
+    await assert.rejects(client.pay(Uint8Array.from([1])), (error: unknown) => {
+      assert.ok(error instanceof NothingSubmitted)
+      assert.match(error.message, /^the sponsor answered 422: .*could not balance dust$/)
+
+      return true
+    })
+
+    sponsor.state.next = { condition: "syncing", snapshot: snapshot({ synced: false }) }
+
+    await assert.rejects(client.pay(Uint8Array.from([1])), NothingSubmitted)
+
+    sponsor.state.next = { condition: "healthy", snapshot: snapshot({}) }
+    sponsor.payer.failure = new Error("the node dropped the connection after the submission")
+
+    await assert.rejects(client.pay(Uint8Array.from([1])), (error: unknown) => {
+      assert.ok(error instanceof Error && !(error instanceof NothingSubmitted))
+      assert.match(error.message, /^the sponsor answered 500: /)
+
+      return true
+    })
+  })
+
+  it("knows nothing was submitted when the sponsor refuses the connection", async () => {
+    const closed = buildSponsorApi({
+      identity: identityOf("seal"),
+      state: new FakeSponsorStateSource(),
+      payer: new RecordingTransactionPayer(),
+      logger: new RecordingLogger()
+    })
+
+    await closed.listen({ host: "127.0.0.1", port: 0 })
+
+    const port = (closed.server.address() as AddressInfo).port
+
+    await closed.close()
+
+    await assert.rejects(clientAs("seal", `https://127.0.0.1:${port}`).pay(Uint8Array.from([1])), NothingSubmitted)
   })
 
   it("admits no caller but seal", async () => {

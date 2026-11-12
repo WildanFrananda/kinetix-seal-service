@@ -122,7 +122,9 @@ test. It refuses to start without the toolchain's database: a skipped database t
   - `POST /v1/transactions/pay`: `{ "transaction": hex }`, a proven and unbound transaction (the ledger's
     `"signature"`, `"proof"`, `"pre-binding"`); the sponsor adds DUST, signs, finalizes, submits, and answers
     `{ "txId" }`. Spends run one at a time. Confirmation is the caller's, through the indexer. While the wallet
-    syncs the answer is 503.
+    syncs the answer is 503. A spend the wallet refuses before submitting it (it cannot balance it, sign it or
+    finalize it: `Insufficient Funds: could not balance dust`) is 422 `spend_refused`, with the wallet's message,
+    so the caller knows nothing was submitted; a failure after the submission began is still 500.
   - Health, readiness and metrics are on 8013, plain HTTP, like every probe in the estate.
 - **Readiness.** The service is ready when Postgres answers and the sponsor, polled every
   `KINETIX_SEAL_SPONSOR_POLL_SECONDS`, reports anything but `syncing`; unreachable is not ready. The sponsor is
@@ -233,6 +235,13 @@ contracts/
 - **A deploy is recorded before it is submitted** (`deploying`, with the contract address the unproven deploy
   already knows). If it never confirms, the next check retires it as `interrupted` and deploys again; the
   orphan, if it landed, costs one fee and holds nothing.
+- **A deploy refused before anything was submitted keeps its number.** `NothingSubmitted` (`src/domain/`) is thrown
+  only where nothing can have reached the chain: a proof that failed or timed out, a sponsor that refused the
+  connection, and a sponsor answer of 400, 403, 404, 413, 422 or 503. `RegistryGenerations` then deletes the
+  `deploying` row (`forgetDeploying`), so the next check deploys under the same number. A 500, a timeout while paying
+  or confirming, and every other failure stay unknown and are retired as `interrupted`. Until 2026-11-11 every failure
+  was unknown: with the sponsor out of DUST after Preprod's ledger 9 upgrade, each check from 07:55 to 15:27 UTC took
+  a number, and generation 49 followed generation 2.
 - **A drill retires the active generation on purpose.** A healthy chain never replaces a generation, so the plan's
   reset drill (S1's exit) has its own command, `node dist/src/cli/retire_registry.js`, which reads only
   `KINETIX_SEAL_DATABASE_URL` and `KINETIX_SEAL_DRILL_GENERATION`, the generation the operator means to retire. It

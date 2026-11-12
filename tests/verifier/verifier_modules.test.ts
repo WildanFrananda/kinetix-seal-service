@@ -5,6 +5,7 @@ import { describe, it } from "node:test"
 import AnswerFrames from "../../verifier/src/answer_frames.ts"
 import IssuedRequests from "../../verifier/src/issued_requests.ts"
 import { linkAnswerOf } from "../../verifier/src/link_answer.ts"
+import { minimumLinesOf } from "../../verifier/src/minimum_lines.ts"
 import { choiceWithRow, predicateMenuOf } from "../../verifier/src/predicate_menu.ts"
 import { requestCode } from "../../verifier/src/presentation_request.ts"
 import { decodeQr } from "../../verifier/src/qr_decoder.ts"
@@ -203,5 +204,31 @@ describe("the checks offered", () => {
 
     assert.equal(menu === undefined ? undefined : choiceWithRow(menu, "bb")?.issuedSince, "2026-09-29")
     assert.equal(predicateMenuOf({ predicates: [] }), undefined)
+  })
+})
+
+describe("the minimums the verdict lists", () => {
+  it("name one delivery and one day in the singular, and every other count in the plural", () => {
+    const choice = {
+      label: "Test credentials",
+      rowId: "aa",
+      deliveries: 1,
+      ratingHundredths: 400,
+      daysActive: 1,
+      issuedSince: "2026-10-06"
+    }
+
+    assert.deepEqual(minimumLinesOf(choice), [
+      "At least 1 delivery",
+      "A rating of at least 4.00",
+      "Active for at least 1 day",
+      "Numbers as of 2026-10-06 or later"
+    ])
+
+    const none = minimumLinesOf({ ...choice, deliveries: 0, daysActive: 0 })
+
+    assert.equal(none[0], "At least 0 deliveries")
+    assert.equal(none[2], "Active for at least 0 days")
+    assert.equal(minimumLinesOf({ ...choice, deliveries: 25 })[0], "At least 25 deliveries")
   })
 })

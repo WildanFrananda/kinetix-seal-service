@@ -6,6 +6,7 @@ interface RegistryGenerationStorePort {
   unretired(): Promise<RegistryGeneration[]>
   highestGeneration(): Promise<number>
   recordDeploying(generation: RegistryGeneration): Promise<void>
+  forgetDeploying(generation: number): Promise<void>
   activate(generation: number, receipt: DeployReceipt): Promise<void>
   retire(retirement: RegistryRetirement): Promise<void>
 }

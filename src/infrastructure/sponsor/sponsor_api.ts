@@ -1,6 +1,7 @@
 import type { TLSSocket } from "node:tls"
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify"
 
+import NothingSubmitted from "../../domain/nothing_submitted.ts"
 import SponsorUnavailable from "../../domain/sponsor_unavailable.ts"
 import type { SponsorApiDependencies } from "../../types/sponsor_api_dependencies.type.ts"
 import { serviceOfCertificate } from "../mesh/spiffe.ts"
@@ -38,6 +39,12 @@ function buildSponsorApi(dependencies: SponsorApiDependencies): FastifyInstance 
     } catch (error) {
       if (error instanceof SponsorUnavailable) {
         return reply.code(503).send({ error: "sponsor_unavailable", message: error.message })
+      }
+
+      if (error instanceof NothingSubmitted) {
+        logger.error({ message: "a spend was refused before it was submitted", requestId: reply.request.id }, error)
+
+        return reply.code(422).send({ error: "spend_refused", message: error.message })
       }
 
       throw error
