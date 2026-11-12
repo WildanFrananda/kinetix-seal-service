@@ -12,7 +12,8 @@ if (databaseUrl === undefined || databaseUrl === "") {
 }
 
 const prisma = createPrismaClient(databaseUrl)
-const store = new PrismaRegistryGenerationStore(prisma)
+const store = new PrismaRegistryGenerationStore(prisma, "credential")
+const reports = new PrismaRegistryGenerationStore(prisma, "report")
 
 const deploying = registryGeneration({
   generation: 1,
@@ -69,7 +70,9 @@ describe("registry generations in Postgres", () => {
     assert.deepEqual(await store.unretired(), [])
     assert.equal(await store.highestGeneration(), 1)
 
-    const row = await prisma.registryGeneration.findUnique({ where: { generation: 1 } })
+    const row = await prisma.registryGeneration.findUnique({
+      where: { registry_generation: { registry: "credential", generation: 1 } }
+    })
 
     assert.equal(row?.retiredReason, "interrupted")
   })
@@ -86,6 +89,25 @@ describe("registry generations in Postgres", () => {
     await store.forgetDeploying(1)
 
     assert.equal((await store.unretired())[0]?.status, "active")
+  })
+
+  it("numbers and retires each registry's generations apart", async () => {
+    await store.recordDeploying(deploying)
+    await store.activate(1, { txId: "00ff", blockHeight: 2, blockHash: "d".repeat(64) })
+    await reports.recordDeploying({ ...deploying, contractAddress: "03cd" })
+
+    assert.equal(await reports.highestGeneration(), 1)
+    assert.deepEqual(
+      (await reports.unretired()).map((row) => row.status),
+      ["deploying"]
+    )
+
+    await reports.retire({ generation: 1, reason: "interrupted" })
+    await reports.forgetDeploying(1)
+
+    assert.deepEqual(await reports.unretired(), [])
+    assert.equal((await store.unretired())[0]?.status, "active")
+    assert.equal(await store.highestGeneration(), 1)
   })
 
   it("refuses a second generation at the same contract address", async () => {

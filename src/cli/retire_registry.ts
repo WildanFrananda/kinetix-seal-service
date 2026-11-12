@@ -8,6 +8,7 @@ import PrismaRegistryGenerationStore from "../infrastructure/postgres/prisma_reg
 const read = new SettingReader(process.env)
 const databaseUrl = read.url("KINETIX_SEAL_DATABASE_URL", ["postgresql:", "postgres:"])
 const generation = read.positiveInteger("KINETIX_SEAL_DRILL_GENERATION")
+const registry = read.oneOf("KINETIX_SEAL_DRILL_REGISTRY", ["credential", "report"])
 
 read.verify()
 redactOutput([{ value: databaseUrl, placeholder: "<database_url>" }])
@@ -19,17 +20,17 @@ const logger = new JsonLogger("kinetix-seal-retire-registry", "info", (line) => 
 const prisma = createPrismaClient(databaseUrl)
 
 try {
-  const outcome = await new RegistryDrill(new PrismaRegistryGenerationStore(prisma)).retire(generation)
+  const outcome = await new RegistryDrill(new PrismaRegistryGenerationStore(prisma, registry)).retire(generation)
 
   if (outcome.kind === "retired") {
     logger.warn({
       message: "the registry generation was retired for a drill; the service deploys the next one on its next check",
-      fields: { generation: outcome.generation, network_id: outcome.networkId }
+      fields: { registry, generation: outcome.generation, network_id: outcome.networkId }
     })
   } else {
     logger.error({
       message: "the drill was refused",
-      fields: { generation, reason: outcome.reason, active_generation: outcome.activeGeneration ?? null }
+      fields: { registry, generation, reason: outcome.reason, active_generation: outcome.activeGeneration ?? null }
     })
 
     process.exitCode = 1

@@ -17,7 +17,7 @@ function generationsWith(rows: RegistryGeneration[]) {
   const store = new FakeRegistryGenerationStore(rows)
   const gauges = new RecordingRegistryGauges()
   const logger = new RecordingLogger()
-  const generations = new RegistryGenerations(chain, store, gauges, logger, "preprod", digest)
+  const generations = new RegistryGenerations("credential", chain, store, gauges, logger, "preprod", digest)
 
   return { chain, store, gauges, logger, generations }
 }
@@ -118,6 +118,16 @@ describe("the registry generations", () => {
     assert.deepEqual(chain.prepared, [3, 3, 3])
     assert.equal(store.statusOf(3), "active")
     assert.deepEqual(store.retirements, [{ generation: 2, reason: "contract_rebuilt" }])
+  })
+
+  it("names its registry in every line it logs", async () => {
+    const { chain, logger, generations } = generationsWith([registryGeneration({ buildDigest: "a".repeat(64) })])
+
+    chain.submitFails = new Error("confirming the deploy of generation 2 timed out after 300 s")
+    await generations.reconcile()
+
+    assert.ok(logger.lines.length >= 3)
+    assert.ok(logger.lines.every((line) => line.fields?.registry === "credential"))
   })
 
   it("runs one reconciliation at a time", async () => {

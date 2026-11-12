@@ -3,12 +3,14 @@ import { confirmedAnchor, decideRegistryGeneration } from "../domain/registry_ge
 import type { AnchorObservation } from "../types/anchor_observation.type.ts"
 import type { RegistryGeneration } from "../types/registry_generation.type.ts"
 import type { RegistryGenerationDecision } from "../types/registry_generation_decision.type.ts"
+import type { RegistryKind } from "../types/registry_kind.type.ts"
 import type { LoggerPort } from "./ports/logger.port.ts"
 import type { RegistryChainPort } from "./ports/registry_chain.port.ts"
 import type { RegistryGaugesPort } from "./ports/registry_gauges.port.ts"
 import type { RegistryGenerationStorePort } from "./ports/registry_generation_store.port.ts"
 
 class RegistryGenerations {
+  private readonly registry: RegistryKind
   private readonly chain: RegistryChainPort
   private readonly store: RegistryGenerationStorePort
   private readonly gauges: RegistryGaugesPort
@@ -19,6 +21,7 @@ class RegistryGenerations {
   private running = false
 
   constructor(
+    registry: RegistryKind,
     chain: RegistryChainPort,
     store: RegistryGenerationStorePort,
     gauges: RegistryGaugesPort,
@@ -26,6 +29,7 @@ class RegistryGenerations {
     networkId: string,
     buildDigest: string
   ) {
+    this.registry = registry
     this.chain = chain
     this.store = store
     this.gauges = gauges
@@ -58,7 +62,7 @@ class RegistryGenerations {
       await this.store.retire(retirement)
       this.logger.warn({
         message: "a registry generation was retired",
-        fields: { generation: retirement.generation, reason: retirement.reason }
+        fields: { registry: this.registry, generation: retirement.generation, reason: retirement.reason }
       })
     }
 
@@ -79,7 +83,11 @@ class RegistryGenerations {
     const observed = await this.chain.observeAnchor(active).catch((error: unknown) => {
       this.logger.warn({
         message: "the registry's chain could not be observed",
-        fields: { generation: active.generation, cause: error instanceof Error ? error.message : String(error) }
+        fields: {
+          registry: this.registry,
+          generation: active.generation,
+          cause: error instanceof Error ? error.message : String(error)
+        }
       })
 
       return "unknown" as const
@@ -109,7 +117,7 @@ class RegistryGenerations {
 
     this.logger.info({
       message: "deploying a registry generation",
-      fields: { generation, contract_address: prepared.contractAddress }
+      fields: { registry: this.registry, generation, contract_address: prepared.contractAddress }
     })
 
     try {
@@ -121,7 +129,12 @@ class RegistryGenerations {
       this.gauges.deployed("succeeded")
       this.logger.info({
         message: "a registry generation is active",
-        fields: { generation, contract_address: prepared.contractAddress, block_height: receipt.blockHeight }
+        fields: {
+          registry: this.registry,
+          generation,
+          contract_address: prepared.contractAddress,
+          block_height: receipt.blockHeight
+        }
       })
     } catch (error) {
       this.gauges.deployed("failed")
@@ -129,14 +142,20 @@ class RegistryGenerations {
       if (error instanceof NothingSubmitted) {
         await this.store.forgetDeploying(generation)
         this.logger.error(
-          { message: "the registry generation was not deployed and nothing was submitted", fields: { generation } },
+          {
+            message: "the registry generation was not deployed and nothing was submitted",
+            fields: { registry: this.registry, generation }
+          },
           error
         )
 
         return
       }
 
-      this.logger.error({ message: "the registry generation could not be deployed", fields: { generation } }, error)
+      this.logger.error(
+        { message: "the registry generation could not be deployed", fields: { registry: this.registry, generation } },
+        error
+      )
     }
   }
 }

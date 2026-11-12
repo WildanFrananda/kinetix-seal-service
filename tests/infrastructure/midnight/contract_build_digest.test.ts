@@ -6,6 +6,7 @@ import { after, before, describe, it } from "node:test"
 
 import { contractBuildDigest } from "../../../src/infrastructure/midnight/contract_build_digest.ts"
 import { credentialRegistryDirectory } from "../../../src/infrastructure/midnight/credential_registry_contract.ts"
+import { reportRegistryDirectory } from "../../../src/infrastructure/midnight/report_registry_contract.ts"
 
 let directory = ""
 
@@ -46,5 +47,12 @@ describe("the contract build digest", () => {
 
   it("reads the compiled credential registry", async () => {
     assert.match(await contractBuildDigest(credentialRegistryDirectory), /^[0-9a-f]{64}$/)
+  })
+
+  it("reads the compiled report registry apart, so a change to one contract renews only its own generation", async () => {
+    const report = await contractBuildDigest(reportRegistryDirectory)
+
+    assert.match(report, /^[0-9a-f]{64}$/)
+    assert.notEqual(report, await contractBuildDigest(credentialRegistryDirectory))
   })
 })
