@@ -128,3 +128,60 @@ model PredicatePlacement {
   @@id([generation, predicateId])
   @@map("predicate_placements")
 }
+
+model DeliveredOrder {
+  orderNumber         String   @id @map("order_number") @db.VarChar(64)
+  buyerPrincipalId    String   @map("buyer_principal_id") @db.VarChar(128)
+  merchantPrincipalId String   @map("merchant_principal_id") @db.VarChar(128)
+  deliveredAt         DateTime @map("delivered_at") @db.Timestamptz(6)
+
+  @@index([buyerPrincipalId])
+  @@map("delivered_orders")
+}
+
+model Reporter {
+  id           String        @id @db.Uuid
+  principalId  String        @map("principal_id") @db.VarChar(128)
+  role         String        @db.VarChar(16)
+  reporterKey  String        @unique @map("reporter_key") @db.VarChar(80)
+  registeredAt DateTime      @map("registered_at") @db.Timestamptz(6)
+  rights       ReportRight[]
+
+  @@index([principalId, role, registeredAt])
+  @@map("reporters")
+}
+
+model ReportRight {
+  id          String             @id @db.Uuid
+  reporterId  String             @map("reporter_id") @db.Uuid
+  principalId String             @map("principal_id") @db.VarChar(128)
+  role        String             @db.VarChar(16)
+  orderNumber String             @map("order_number") @db.VarChar(64)
+  merchantTag String             @map("merchant_tag") @db.Char(64)
+  window      Int
+  leaf        String             @unique @db.Char(64)
+  createdAt   DateTime           @map("created_at") @db.Timestamptz(6)
+  reporter    Reporter           @relation(fields: [reporterId], references: [id])
+  grants      ReportRightGrant[]
+
+  @@unique([principalId, role, orderNumber])
+  @@index([merchantTag, window])
+  @@map("report_rights")
+}
+
+model ReportRightGrant {
+  rightId     String      @map("right_id") @db.Uuid
+  generation  Int
+  status      String      @db.VarChar(16)
+  leafIndex   BigInt?     @map("leaf_index")
+  txId        String?     @map("tx_id") @db.VarChar(160)
+  attempts    Int
+  queuedAt    DateTime    @map("queued_at") @db.Timestamptz(6)
+  submittedAt DateTime?   @map("submitted_at") @db.Timestamptz(6)
+  grantedAt   DateTime?   @map("granted_at") @db.Timestamptz(6)
+  right       ReportRight @relation(fields: [rightId], references: [id])
+
+  @@id([rightId, generation])
+  @@index([generation, status, queuedAt])
+  @@map("report_right_grants")
+}

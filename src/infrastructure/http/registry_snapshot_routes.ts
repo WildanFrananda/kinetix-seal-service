@@ -8,8 +8,6 @@ import type { RegistrySnapshotWire } from "../../types/registry_snapshot_wire.ty
 import { problem } from "./problem.ts"
 import { routeTemplate } from "./route_template.ts"
 
-const snapshotRoute = "/api/v1/seal/registry/snapshot"
-
 function wireOf(snapshot: RegistrySnapshot): RegistrySnapshotWire {
   return {
     generation: snapshot.generation,
@@ -26,11 +24,11 @@ function registerRegistrySnapshotRoutes(
   server: FastifyInstance,
   dependencies: RegistrySnapshotRouteDependencies
 ): void {
-  const { snapshots, logger, metrics } = dependencies
+  const { route, snapshots, logger, metrics } = dependencies
 
-  metrics.httpRequests.inc({ method: "GET", route: routeTemplate(snapshotRoute), status: "200" }, 0)
+  metrics.httpRequests.inc({ method: "GET", route: routeTemplate(route), status: "200" }, 0)
 
-  server.get(snapshotRoute, async (request, reply) => {
+  server.get(route, async (request, reply) => {
     let snapshot: RegistrySnapshot | undefined
 
     try {
@@ -39,7 +37,7 @@ function registerRegistrySnapshotRoutes(
       logger.warn({
         message: "the registry could not be read for a snapshot",
         requestId: request.id,
-        fields: { cause: error instanceof Error ? error.message : String(error) }
+        fields: { route, cause: error instanceof Error ? error.message : String(error) }
       })
     }
 

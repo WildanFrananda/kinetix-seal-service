@@ -1,3 +1,3 @@
-type FeedStream = "deliveries" | "reviews"
+type FeedStream = "deliveries" | "reviews" | "orders"
 
 export type { FeedStream }

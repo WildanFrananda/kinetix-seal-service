@@ -25,6 +25,7 @@ function readServiceConfig(env: NodeJS.ProcessEnv): ServiceConfig {
     facts: {
       matchingAddress: read.address("KINETIX_SEAL_MATCHING_GRPC_ADDR"),
       reviewAddress: read.address("KINETIX_SEAL_REVIEW_GRPC_ADDR"),
+      orderAddress: read.address("KINETIX_SEAL_ORDER_GRPC_ADDR"),
       tickSeconds: read.positiveInteger("KINETIX_SEAL_FACTS_TICK_SECONDS"),
       callTimeoutSeconds: read.positiveInteger("KINETIX_SEAL_FEED_TIMEOUT_SECONDS"),
       pageSize: read.positiveIntegerAtMost("KINETIX_SEAL_FEED_PAGE_SIZE", 500),
@@ -48,6 +49,9 @@ function readServiceConfig(env: NodeJS.ProcessEnv): ServiceConfig {
     predicates: {
       periodDays: read.positiveIntegerAtMost("KINETIX_SEAL_PREDICATE_PERIOD_DAYS", 365),
       reconcileSeconds: read.positiveInteger("KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS")
+    },
+    reports: {
+      grantSeconds: read.positiveInteger("KINETIX_SEAL_REPORT_GRANT_SECONDS")
     },
     registryCheckSeconds: read.positiveInteger("KINETIX_SEAL_REGISTRY_CHECK_SECONDS"),
     midnightStepSeconds: read.positiveInteger("KINETIX_SEAL_MIDNIGHT_STEP_SECONDS"),

@@ -6,28 +6,8 @@ import type { FeedCatchUp } from "../../types/feed_catch_up.type.ts"
 import type { FeedStream } from "../../types/feed_stream.type.ts"
 import type { LogCursor } from "../../types/log_cursor.type.ts"
 import type { ReviewRecord } from "../../types/review_record.type.ts"
-import type { Prisma, PrismaClient } from "./generated/client.ts"
-
-async function advance(
-  transaction: Prisma.TransactionClient,
-  stream: FeedStream,
-  from: LogCursor,
-  next: LogCursor,
-  caughtUp: boolean
-): Promise<void> {
-  const moved = await transaction.feedCursor.updateMany({
-    where: { stream, throughTransaction: from.transactionId, throughSequence: from.sequence },
-    data: {
-      throughTransaction: next.transactionId,
-      throughSequence: next.sequence,
-      ...(caughtUp ? { caughtUpAt: new Date() } : {})
-    }
-  })
-
-  if (moved.count !== 1) {
-    throw new Error(`the ${stream} cursor moved under this page`)
-  }
-}
+import { advanceFeedCursor } from "./advance_feed_cursor.ts"
+import type { PrismaClient } from "./generated/client.ts"
 
 function caughtUpOf(rows: { stream: string; caughtUpAt: Date | null }[], stream: FeedStream): Date | undefined {
   return rows.find((row) => row.stream === stream)?.caughtUpAt ?? undefined
@@ -57,7 +37,7 @@ class PrismaCourierFactStore implements CourierFactStorePort, CourierFactReaderP
     caughtUp: boolean
   ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
-      await advance(transaction, "deliveries", from, next, caughtUp)
+      await advanceFeedCursor(transaction, "deliveries", from, next, caughtUp)
 
       if (deliveries.length > 0) {
         await transaction.courierDelivery.createMany({
@@ -79,7 +59,7 @@ class PrismaCourierFactStore implements CourierFactStorePort, CourierFactReaderP
     caughtUp: boolean
   ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
-      await advance(transaction, "reviews", from, next, caughtUp)
+      await advanceFeedCursor(transaction, "reviews", from, next, caughtUp)
 
       if (reviews.length > 0) {
         await transaction.driverReview.createMany({

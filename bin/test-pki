@@ -40,6 +40,8 @@ leaf matching ca kinetix-matching-service \
   spiffe://kinetix.local/service/matching kinetix-matching-service kinetix-matching-grpc localhost
 leaf review ca kinetix-review-service \
   spiffe://kinetix.local/service/review kinetix-review-service kinetix-review-grpc localhost
+leaf order ca kinetix-order-service \
+  spiffe://kinetix.local/service/order kinetix-order-service localhost
 leaf impostor ca kinetix-matching-service spiffe://kinetix.local/service/review kinetix-matching-service localhost
 leaf foreign-matching foreign-ca kinetix-matching-service \
   spiffe://kinetix.local/service/matching kinetix-matching-service localhost

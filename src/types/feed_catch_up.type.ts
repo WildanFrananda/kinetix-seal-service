@@ -1,5 +1,6 @@
-import type { FeedStream } from "./feed_stream.type.ts"
-
-type FeedCatchUp = Record<FeedStream, Date | undefined>
+type FeedCatchUp = {
+  deliveries: Date | undefined
+  reviews: Date | undefined
+}
 
 export type { FeedCatchUp }

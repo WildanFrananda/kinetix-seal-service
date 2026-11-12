@@ -22,7 +22,10 @@ function rootWithoutLeafHash(path: MerkleTreePath<Uint8Array>): bigint {
   return digest
 }
 
-function issuedLeafIndex(issued: Ledger["issued"], leaf: Uint8Array): bigint | undefined {
+function issuedLeafIndex(
+  issued: Pick<Ledger["issued"], "root" | "firstFree" | "pathForLeaf">,
+  leaf: Uint8Array
+): bigint | undefined {
   const root = issued.root().field
 
   for (let index = issued.firstFree() - 1n; index >= 0n; index -= 1n) {

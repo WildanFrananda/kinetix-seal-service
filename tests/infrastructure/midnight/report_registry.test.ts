@@ -7,6 +7,9 @@ import { Zkir } from "@midnightntwrk/zkir-v3"
 
 import { pureCircuits as credentialCircuits } from "#contracts/credential_registry/contract/index.js"
 import { type FiledReport, pureCircuits } from "#contracts/report_registry/contract/index.js"
+import { merchantTagOf } from "../../../src/domain/merchant_tag.ts"
+import { reportOrderOf } from "../../../src/domain/report_order.ts"
+import { reportWindowOf } from "../../../src/domain/report_window.ts"
 import { reportRegistryDirectory } from "../../../src/infrastructure/midnight/report_registry_contract.ts"
 import type { IssuerPrivateState } from "../../../src/types/issuer_private_state.type.ts"
 import type { ReporterPrivateState } from "../../../src/types/reporter_private_state.type.ts"
@@ -91,6 +94,22 @@ describe("the report registry contract", () => {
     const filed = registry.ledger().reports.lookup(pureCircuits.reportNullifier(reporter.reporterSecret, order))
 
     assert.deepEqual(filed, { merchant, window: november2026, digest })
+    assert.equal(registry.ledger().reports.size(), 1n)
+  })
+
+  it("lets a reporter report the right seal builds from a delivered order, its merchant and its month", async () => {
+    const issuer = newIssuer()
+    const registry = await InMemoryReportRegistry.deploy(issuer.issuerSecret)
+    const tag = merchantTagOf(issuer.issuerSecret, "mer_1")
+    const window = BigInt(reportWindowOf(new Date("2026-11-08T10:00:00Z")))
+    const reporter = await grantTo(registry, issuer, {
+      merchant: tag,
+      window,
+      order: reportOrderOf("ORD-20261108-8AA3A287")
+    })
+
+    assert.equal(window, november2026)
+    await registry.report(tag, window, digestOf("seal's own right"), reporter)
     assert.equal(registry.ledger().reports.size(), 1n)
   })
 

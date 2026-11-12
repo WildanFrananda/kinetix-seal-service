@@ -31,6 +31,7 @@ function surface(generations: RegistryGeneration[] = [registryGeneration({ gener
   })
 
   registerRegistrySnapshotRoutes(server, {
+    route: "/api/v1/seal/registry/snapshot",
     snapshots: new RegistrySnapshots(source, new FakeRegistryGenerationStore(generations), 60, function now(): Date {
       return new Date("2026-11-03T03:00:00Z")
     }),

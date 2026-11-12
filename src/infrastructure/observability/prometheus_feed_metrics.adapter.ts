@@ -4,7 +4,7 @@ import type { FeedMetricsPort } from "../../application/ports/feed_metrics.port.
 import type { FeedFailureKind } from "../../types/feed_failure_kind.type.ts"
 import type { FeedStream } from "../../types/feed_stream.type.ts"
 
-const streams: readonly FeedStream[] = ["deliveries", "reviews"]
+const streams: readonly FeedStream[] = ["deliveries", "reviews", "orders"]
 const kinds: readonly FeedFailureKind[] = ["refused", "unavailable", "invalid_page", "store"]
 
 class PrometheusFeedMetrics implements FeedMetricsPort {

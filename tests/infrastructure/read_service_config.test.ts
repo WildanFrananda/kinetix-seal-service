@@ -18,6 +18,7 @@ const complete: NodeJS.ProcessEnv = {
   KINETIX_TRUST_DOMAIN: "kinetix.local, prod.kinetix",
   KINETIX_SEAL_MATCHING_GRPC_ADDR: "kinetix-matching-service:50053",
   KINETIX_SEAL_REVIEW_GRPC_ADDR: "kinetix-review-grpc:50060",
+  KINETIX_SEAL_ORDER_GRPC_ADDR: "kinetix-order-service:50055",
   KINETIX_SEAL_FACTS_TICK_SECONDS: "60",
   KINETIX_SEAL_FEED_TIMEOUT_SECONDS: "30",
   KINETIX_SEAL_FEED_PAGE_SIZE: "500",
@@ -33,6 +34,7 @@ const complete: NodeJS.ProcessEnv = {
   JWT_AUDIENCE: "kinetix",
   KINETIX_SEAL_JWKS_TIMEOUT_SECONDS: "10",
   KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS: "30",
+  KINETIX_SEAL_REPORT_GRANT_SECONDS: "30",
   KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS: "300",
   KINETIX_SEAL_PREDICATE_PERIOD_DAYS: "7",
   KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS: "300"
@@ -56,6 +58,8 @@ describe("reading the service's configuration", () => {
 
     assert.deepEqual(config.credentials, { issueSeconds: 30, factsMaxAgeSeconds: 300 })
     assert.deepEqual(config.predicates, { periodDays: 7, reconcileSeconds: 300 })
+    assert.deepEqual(config.reports, { grantSeconds: 30 })
+    assert.equal(config.facts.orderAddress, "kinetix-order-service:50055")
   })
 
   it("needs the predicate settings, a period of at most a year", () => {

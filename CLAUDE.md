@@ -424,6 +424,51 @@ finding 1); a verifier cannot narrow a holder's values down with arbitrary thres
 - The registry adapter (`MidnightCredentialChain`) serves both the issuer and the keeper; each circuit call reads
   the registry's state, builds the call, and goes through the same prove, pay and confirm path.
 
+### Report rights (S3c)
+
+Infra `docs/SEAL-SERVICE.md` §9 is the design: a buyer of a delivered order, or the courier who carried it, holds one
+right to report its merchant, granted into the report registry without seal or anyone learning later which order a
+report came from.
+
+- **Delivered orders come from order's lifecycle log** (`order.v1.OrderLifecycleService/LifecycleEventsSince`, granted
+  to `seal` on order's allow list), drained on the fact tick by `DeliveredOrders` into `delivered_orders` under the
+  `orders` cursor, with the feeds' rules (compare-and-swap cursor, every page checked first). The adapter returns every
+  event with its position and a `delivery` only for a `STATUS_CHANGED` to `DELIVERED`, so `feedPageViolation` checks
+  the whole page; a delivery without its buyer, merchant or time is an invalid page. `BASELINE` events give no right:
+  they carry the time the log first saw an order, not its delivery, so they cannot name the delivery's month.
+- **A reporter registers once, logged in**: `POST /api/v1/seal/reporters` with exactly `{ "reporterKey": "<decimal>" }`,
+  the contract's `reporterKey(secret)` computed on the device (the secret never leaves it). A `customer` is a `buyer`,
+  a `courier` a `courier`; anyone else is 403 `REPORTER_ROLE_REQUIRED`. 201 for a new key, 200 for a repeat by its
+  owner, 409 `REPORTER_KEY_TAKEN` for a key another account holds, 400 `INVALID_REQUEST`. A principal's newest key is
+  its current one.
+- **Rights are added by seal, never asked for** (`ReportRights.addDue`, every `KINETIX_SEAL_REPORT_GRANT_SECONDS`): for
+  each principal's current key, every delivered order it bought (`delivered_orders.buyer_principal_id`) or carried
+  (matching's `courier_deliveries` joined by order number, the merchant from order's log) that the principal holds no
+  right for under any key. So a new key on a new device gets only orders no earlier key holds, and an order is
+  reported once per reporter. One right per `(principal, role, order)`.
+- **The leaf** is the contract's `rightLeaf(merchantTag, window, order, reporterKey)`: the merchant's tag is
+  HMAC-SHA-256 of its principal under a key hashed from the issuer secret (`merchantTagOf`, so the chain never names a
+  merchant), the window is the delivery's calendar month in UTC (`reportWindowOf`, SEAL-D21), and the order is its
+  number in UTF-8 padded to 32 bytes (`reportOrderOf`; a number over 32 bytes is refused). A test grants such a right
+  in the in-memory registry and reports it.
+- **Granting is a queue** (`RightGranter`, the same tick, while the sponsor is past `syncing`), the credential
+  issuer's shape: `queueAll` gives every right a `pending` row in the active report generation, rows settle one at a
+  time and the tick stops at the first failure; a row is `uncertain` before its `grant` is submitted and is looked up
+  in `rights` before it is submitted again. A new report generation therefore gets every right again, which is S3b's
+  re-grant.
+- **`GET /api/v1/seal/report-rights`** lists the caller's own rights: order number, the order's 32 bytes in hex, the
+  key it was granted under, the merchant tag, the window, the delivery time, `granted` with its leaf index or
+  `pending`, and the crowd: the distinct reporter keys holding a granted right for that tag and window in the active
+  generation (SEAL-D20). `registry` names the active report generation. Both routes answer `Cache-Control: no-store`.
+- **`GET /api/v1/seal/report-registry/snapshot`** is the report registry's state, served like the credential
+  registry's by the same route builder; a holder computes its Merkle path from it, never by asking seal for one leaf.
+- Metrics: `kinetix_seal_reporter_registrations_total{outcome}`, `kinetix_seal_report_grants_total{outcome}`,
+  `kinetix_seal_report_rights_added_total`; the feed's under `stream="orders"`. The grant logs name the right's id and
+  generation, never the principal or the order.
+- **Database tests run one file at a time** (`bin/test`): they share one database, and two files that clean the same
+  table under each other (courier facts and report rights both write `courier_deliveries`) failed each other on
+  2026-11-12.
+
 ### The holder runtime and the relay (S1f)
 
 SEAL-D9: no GPL code ships to a holder. SEAL-D18: the verifier, not the holder's phone, hands a presentation to
@@ -582,6 +627,6 @@ already serves the holder's page). No account and no token.
 
 - A gRPC server of seal's own: nothing calls seal over the mesh yet.
 - S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions.
-- S3 beyond its registry: the report registry contract (S3a, `contracts/src/report_registry/`) and its generations
-  (S3b) exist; reporter keys and rights (S3c), the report route (S3d), cases (S3e), the courier app (S3f) and the lab
-  run (S3g) do not (infra `docs/SEAL-SERVICE.md` §9 and §11).
+- S3 beyond its rights: the report registry (S3a), its generations (S3b) and reporter keys and rights (S3c) exist; the
+  report route and the minimum crowd (S3d), cases (S3e), the courier app (S3f) and the lab run (S3g) do not (infra
+  `docs/SEAL-SERVICE.md` §9 and §11).
