@@ -1,4 +1,4 @@
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS compactc
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS compactc
 
 ARG TARGETARCH
 
@@ -16,7 +16,7 @@ RUN case "$TARGETARCH" in \
  && mkdir /compactc \
  && unzip -q "/tmp/$zip" -d /compactc
 
-FROM alpine:3.22.2@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412 AS step
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS step
 
 ARG TARGETARCH
 
@@ -29,7 +29,7 @@ RUN tarball="step_linux_0.30.2_${TARGETARCH}.tar.gz" \
  && tar -xzf "/tmp/$tarball" -C /tmp \
  && install -m 0755 /tmp/step_0.30.2/bin/step /step
 
-FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
+FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
 
 COPY --from=compactc /compactc /opt/compactc
 COPY --from=compactc /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
