@@ -17,7 +17,9 @@ import Readiness from "./application/readiness.service.ts"
 import RegistryGenerations from "./application/registry_generations.service.ts"
 import RegistrySnapshots from "./application/registry_snapshots.service.ts"
 import RemoteSponsorStatus from "./application/remote_sponsor_status.service.ts"
+import ReportKeeper from "./application/report_keeper.service.ts"
 import ReportRights from "./application/report_rights.service.ts"
+import ReportSubmissions from "./application/report_submissions.service.ts"
 import ReporterRegistry from "./application/reporter_registry.service.ts"
 import RightGranter from "./application/right_granter.service.ts"
 import { presentationStatusMaxAgeSeconds } from "./domain/presentation_status_age.ts"
@@ -28,8 +30,10 @@ import GrpcOrderLifecycleFeed from "./infrastructure/grpc/grpc_order_lifecycle_f
 import GrpcReviewFeed from "./infrastructure/grpc/grpc_review_feed.adapter.ts"
 import BundleAssets from "./infrastructure/http/bundle_assets.ts"
 import { registerCredentialRoutes } from "./infrastructure/http/credential_routes.ts"
+import { registerFiledReportRoutes } from "./infrastructure/http/filed_report_routes.ts"
 import { registerHolderRoutes } from "./infrastructure/http/holder_routes.ts"
 import { buildHttpServer } from "./infrastructure/http/http_server.ts"
+import KeyedIpRateLimiter from "./infrastructure/http/keyed_ip_rate_limiter.ts"
 import { registerPredicateRoutes } from "./infrastructure/http/predicate_routes.ts"
 import { registerPresentationRoutes } from "./infrastructure/http/presentation_routes.ts"
 import { registerRegistrySnapshotRoutes } from "./infrastructure/http/registry_snapshot_routes.ts"
@@ -42,6 +46,7 @@ import { contractBuildDigest } from "./infrastructure/midnight/contract_build_di
 import { credentialRegistryDirectory } from "./infrastructure/midnight/credential_registry_contract.ts"
 import IndexerBlocks from "./infrastructure/midnight/indexer_blocks.ts"
 import LedgerPresentationInspector from "./infrastructure/midnight/ledger_presentation_inspector.ts"
+import LedgerReportInspector from "./infrastructure/midnight/ledger_report_inspector.ts"
 import MidnightCredentialChain from "./infrastructure/midnight/midnight_credential_chain.adapter.ts"
 import MidnightRegistryChain from "./infrastructure/midnight/midnight_registry_chain.adapter.ts"
 import MidnightReportChain from "./infrastructure/midnight/midnight_report_chain.adapter.ts"
@@ -62,9 +67,11 @@ import PrismaCourierFactStore from "./infrastructure/postgres/prisma_courier_fac
 import PrismaCredentialStore from "./infrastructure/postgres/prisma_credential_store.adapter.ts"
 import PrismaDatabaseProbe from "./infrastructure/postgres/prisma_database_probe.adapter.ts"
 import PrismaDeliveredOrderStore from "./infrastructure/postgres/prisma_delivered_order_store.adapter.ts"
+import PrismaFiledReportStore from "./infrastructure/postgres/prisma_filed_report_store.adapter.ts"
 import PrismaPredicatePlacementStore from "./infrastructure/postgres/prisma_predicate_placement_store.adapter.ts"
 import PrismaPredicateTemplateStore from "./infrastructure/postgres/prisma_predicate_template_store.adapter.ts"
 import PrismaRegistryGenerationStore from "./infrastructure/postgres/prisma_registry_generation_store.adapter.ts"
+import PrismaReportCategoryStore from "./infrastructure/postgres/prisma_report_category_store.adapter.ts"
 import PrismaReportRightStore from "./infrastructure/postgres/prisma_report_right_store.adapter.ts"
 import PrismaReporterStore from "./infrastructure/postgres/prisma_reporter_store.adapter.ts"
 import { repeat } from "./infrastructure/scheduling/repeat.ts"
@@ -189,6 +196,29 @@ const reportRights = new ReportRights(
 )
 
 const rightGranter = new RightGranter(reportChain, reportRightStore, reportGenerationStore, reportMetrics, logger, now)
+const reportCategoryStore = new PrismaReportCategoryStore(prisma)
+const filedReportStore = new PrismaFiledReportStore(prisma)
+const reportSubmissions = new ReportSubmissions({
+  categories: reportCategoryStore,
+  generations: reportGenerationStore,
+  reports: filedReportStore,
+  inspector: new LedgerReportInspector(),
+  chain: reportChain,
+  payer: sponsor,
+  metrics: reportMetrics,
+  logger,
+  minimumHolders: config.reports.minimumHolders
+})
+
+const reportKeeper = new ReportKeeper({
+  generations: reportGenerationStore,
+  reports: filedReportStore,
+  chain: reportChain,
+  metrics: reportMetrics,
+  logger
+})
+
+const reportIpLimiter = new KeyedIpRateLimiter(config.reports.ipLimitMax, config.reports.ipLimitWindowSeconds)
 
 const registryChain = new MidnightCredentialChain({
   payer: sponsor,
@@ -275,6 +305,13 @@ registerReportRoutes(server, {
   logger,
   metrics,
   clock: now
+})
+
+registerFiledReportRoutes(server, {
+  submissions: reportSubmissions,
+  rateLimiter: reportIpLimiter,
+  reportMetrics,
+  metrics
 })
 
 registerPresentationRoutes(server, {
@@ -408,6 +445,20 @@ stops.push(
 
     await predicateKeeper.reconcile().catch((error: unknown) => {
       logger.error({ message: "the registry's predicates could not be reconciled" }, error)
+    })
+  })
+)
+
+stops.push(
+  repeat(config.reports.keepSeconds, async () => {
+    const condition = sponsorStatus.condition()
+
+    if (condition === "syncing" || condition === "unreachable") {
+      return
+    }
+
+    await reportKeeper.keep().catch((error: unknown) => {
+      logger.error({ message: "filed anonymous reports could not be kept in the registry" }, error)
     })
   })
 )

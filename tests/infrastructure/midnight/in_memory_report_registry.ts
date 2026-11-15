@@ -1,17 +1,21 @@
 import { randomBytes } from "node:crypto"
+import { readFile } from "node:fs/promises"
+import { join } from "node:path"
 import {
   createUnprovenCallTxFromInitialStates,
   createUnprovenDeployTxFromVerifierKeys,
   type Ledger9CallOptionsWithPrivateState
 } from "@midnight-ntwrk/midnight-js-contracts"
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider"
-import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
+import { Transaction, ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
 import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
 import {
   ChargedState,
   type ContractState,
   sampleSigningKey
 } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime"
+import { createLedger9ProofProvider } from "@midnight-ntwrk/midnight-js-types"
+import { type ProvingKeyMaterial, provingProvider } from "@midnightntwrk/zkir-v3"
 
 import {
   type Contract,
@@ -103,6 +107,45 @@ class InMemoryReportRegistry {
     as: ReportRegistryPrivateState
   ): Promise<void> {
     await this.call("report", [merchant, window, digest], as)
+  }
+
+  async proveReport(
+    merchant: Uint8Array,
+    window: bigint,
+    digest: Uint8Array,
+    as: ReportRegistryPrivateState
+  ): Promise<Uint8Array> {
+    const paramsDirectory = process.env.MIDNIGHT_PP
+
+    if (paramsDirectory === undefined || paramsDirectory === "") {
+      throw new Error("MIDNIGHT_PP is required: proving report needs the public parameters")
+    }
+
+    const options = {
+      compiledContract,
+      circuitId: "report",
+      contractAddress: this.address,
+      args: [merchant, window, digest],
+      coinPublicKey: this.zswap.coinPublicKey,
+      ...inMemoryCallStates(this.state),
+      initialPrivateState: as,
+      config: inMemoryConfig
+    } as Ledger9CallOptionsWithPrivateState<Registry, "report">
+
+    const called = await createUnprovenCallTxFromInitialStates(zkConfig, options, this.zswap.encryptionPublicKey)
+    const material = await zkConfig.get("report")
+    const keyMaterial = {
+      lookupKey: async (): Promise<ProvingKeyMaterial> => ({
+        proverKey: material.proverKey,
+        verifierKey: material.verifierKey,
+        ir: material.zkir
+      }),
+      getParams: async (k: number): Promise<Uint8Array> => readFile(join(paramsDirectory, `bls_midnight_2p${k}`))
+    }
+
+    const proven = await createLedger9ProofProvider(provingProvider(keyMaterial)).proveTx(called.private.unprovenTx)
+
+    return proven.deserialize({ v9: Transaction }).bind().serialize()
   }
 
   private async call<K extends RegistryCircuit>(
