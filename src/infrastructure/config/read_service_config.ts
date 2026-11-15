@@ -51,7 +51,11 @@ function readServiceConfig(env: NodeJS.ProcessEnv): ServiceConfig {
       reconcileSeconds: read.positiveInteger("KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS")
     },
     reports: {
-      grantSeconds: read.positiveInteger("KINETIX_SEAL_REPORT_GRANT_SECONDS")
+      grantSeconds: read.positiveInteger("KINETIX_SEAL_REPORT_GRANT_SECONDS"),
+      minimumHolders: read.positiveInteger("KINETIX_SEAL_REPORT_MINIMUM_HOLDERS"),
+      keepSeconds: read.positiveInteger("KINETIX_SEAL_REPORT_KEEP_SECONDS"),
+      ipLimitMax: read.positiveInteger("KINETIX_SEAL_REPORT_IP_LIMIT_MAX"),
+      ipLimitWindowSeconds: read.positiveInteger("KINETIX_SEAL_REPORT_IP_LIMIT_WINDOW_SECONDS")
     },
     registryCheckSeconds: read.positiveInteger("KINETIX_SEAL_REGISTRY_CHECK_SECONDS"),
     midnightStepSeconds: read.positiveInteger("KINETIX_SEAL_MIDNIGHT_STEP_SECONDS"),

@@ -185,3 +185,50 @@ model ReportRightGrant {
   @@index([generation, status, queuedAt])
   @@map("report_right_grants")
 }
+
+model ReportCategory {
+  slug      String        @id @db.VarChar(48)
+  label     String        @db.VarChar(120)
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  reports   FiledReport[]
+
+  @@map("report_categories")
+}
+
+model FiledReport {
+  nullifier       String         @id @db.VarChar(64)
+  categorySlug    String         @map("category_slug") @db.VarChar(48)
+  body            String         @db.Text
+  salt            String         @db.VarChar(64)
+  digest          String         @db.VarChar(64)
+  merchantTag     String         @map("merchant_tag") @db.VarChar(64)
+  window          BigInt
+  status          String         @db.VarChar(16)
+  firstGeneration Int            @map("first_generation")
+  txId            String?        @map("tx_id") @db.VarChar(160)
+  submittedAt     DateTime       @map("submitted_at") @db.Timestamptz(6)
+  confirmedAt     DateTime?      @map("confirmed_at") @db.Timestamptz(6)
+  category        ReportCategory @relation(fields: [categorySlug], references: [slug])
+  seeds           ReportSeed[]
+
+  @@index([merchantTag, window])
+  @@index([status, submittedAt])
+  @@map("filed_reports")
+}
+
+model ReportSeed {
+  nullifier   String      @db.VarChar(64)
+  generation  Int
+  status      String      @db.VarChar(16)
+  txId        String?     @map("tx_id") @db.VarChar(160)
+  attempts    Int
+  queuedAt    DateTime    @map("queued_at") @db.Timestamptz(6)
+  submittedAt DateTime?   @map("submitted_at") @db.Timestamptz(6)
+  seededAt    DateTime?   @map("seeded_at") @db.Timestamptz(6)
+  report      FiledReport @relation(fields: [nullifier], references: [nullifier])
+
+  @@id([nullifier, generation])
+  @@index([generation, status, queuedAt])
+  @@map("report_seeds")
+}

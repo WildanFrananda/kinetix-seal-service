@@ -35,6 +35,10 @@ const complete: NodeJS.ProcessEnv = {
   KINETIX_SEAL_JWKS_TIMEOUT_SECONDS: "10",
   KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS: "30",
   KINETIX_SEAL_REPORT_GRANT_SECONDS: "30",
+  KINETIX_SEAL_REPORT_MINIMUM_HOLDERS: "20",
+  KINETIX_SEAL_REPORT_KEEP_SECONDS: "30",
+  KINETIX_SEAL_REPORT_IP_LIMIT_MAX: "10",
+  KINETIX_SEAL_REPORT_IP_LIMIT_WINDOW_SECONDS: "60",
   KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS: "300",
   KINETIX_SEAL_PREDICATE_PERIOD_DAYS: "7",
   KINETIX_SEAL_PREDICATE_RECONCILE_SECONDS: "300"
@@ -58,7 +62,14 @@ describe("reading the service's configuration", () => {
 
     assert.deepEqual(config.credentials, { issueSeconds: 30, factsMaxAgeSeconds: 300 })
     assert.deepEqual(config.predicates, { periodDays: 7, reconcileSeconds: 300 })
-    assert.deepEqual(config.reports, { grantSeconds: 30 })
+    assert.deepEqual(config.reports, {
+      grantSeconds: 30,
+      minimumHolders: 20,
+      keepSeconds: 30,
+      ipLimitMax: 10,
+      ipLimitWindowSeconds: 60
+    })
+
     assert.equal(config.facts.orderAddress, "kinetix-order-service:50055")
   })
 
