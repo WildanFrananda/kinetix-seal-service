@@ -36,25 +36,19 @@ class DeliveredOrders {
     this.running = true
 
     try {
-      const { store, feed } = this
-
       await drainFeedStream({
         stream: "orders",
         limits: this.limits,
         metrics: this.metrics,
         logger: this.logger,
-        cursor: function () {
-          return store.cursor()
-        },
-        fetch: function (after, limit) {
-          return feed.eventsSince(after, limit)
-        },
-        record: async function (after, page) {
+        cursor: () => this.store.cursor(),
+        fetch: (after, limit) => this.feed.eventsSince(after, limit),
+        record: async (after, page) => {
           const deliveries = page.records.flatMap((record): DeliveredOrder[] =>
             record.delivery === undefined ? [] : [record.delivery]
           )
 
-          await store.recordDelivered(after, page.next, deliveries, !page.hasMore)
+          await this.store.recordDelivered(after, page.next, deliveries, !page.hasMore)
 
           return deliveries.length
         }
