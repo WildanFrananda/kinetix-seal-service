@@ -51,16 +51,22 @@ class CourierFacts {
   }
 
   private async drainStream(stream: FeedStream): Promise<void> {
+    const { store, deliveries, reviews } = this
+
     if (stream === "deliveries") {
       await drainFeedStream({
         stream,
         limits: this.limits,
         metrics: this.metrics,
         logger: this.logger,
-        cursor: () => this.store.cursor(stream),
-        fetch: (after, limit) => this.deliveries.deliveriesSince(after, limit),
-        record: async (after, page) => {
-          await this.store.recordDeliveries(after, page.next, page.records, !page.hasMore)
+        cursor: function () {
+          return store.cursor(stream)
+        },
+        fetch: function (after, limit) {
+          return deliveries.deliveriesSince(after, limit)
+        },
+        record: async function (after, page) {
+          await store.recordDeliveries(after, page.next, page.records, !page.hasMore)
 
           return page.records.length
         }
@@ -74,12 +80,16 @@ class CourierFacts {
       limits: this.limits,
       metrics: this.metrics,
       logger: this.logger,
-      cursor: () => this.store.cursor(stream),
-      fetch: (after, limit) => this.reviews.reviewsSince(after, limit),
-      record: async (after, page) => {
+      cursor: function () {
+        return store.cursor(stream)
+      },
+      fetch: function (after, limit) {
+        return reviews.reviewsSince(after, limit)
+      },
+      record: async function (after, page) {
         const driverReviews = page.records.filter((review) => review.kind === "driver")
 
-        await this.store.recordDriverReviews(after, page.next, driverReviews, !page.hasMore)
+        await store.recordDriverReviews(after, page.next, driverReviews, !page.hasMore)
 
         return driverReviews.length
       }

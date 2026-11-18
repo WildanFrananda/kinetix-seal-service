@@ -23,7 +23,9 @@ class MidnightRegistryChain implements RegistryChainPort {
       compiledContract,
       kind: "credential",
       generation,
-      issuerPublicKey: (secret) => pureCircuits.issuerPublicKey(secret),
+      issuerPublicKey: function (secret) {
+        return pureCircuits.issuerPublicKey(secret)
+      },
       what: `the deploy of generation ${generation}`
     })
   }

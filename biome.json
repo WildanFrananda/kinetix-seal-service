@@ -65,6 +65,22 @@
           }
         }
       }
+    },
+    {
+      "includes": [
+        "src/application/courier_facts.service.ts",
+        "src/application/delivered_orders.service.ts",
+        "src/application/credential_issuer.service.ts",
+        "src/application/right_granter.service.ts",
+        "src/infrastructure/midnight/midnight_registry_chain.adapter.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "useArrowFunction": "off"
+          }
+        }
+      }
     }
   ],
   "plugins": [

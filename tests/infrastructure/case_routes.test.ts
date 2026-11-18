@@ -148,35 +148,60 @@ describe("the case routes", () => {
     assert.equal(notFound.json().error, "CASE_NOT_FOUND")
   })
 
-  it("opens opaque non-UUID merchant principal IDs returned by the list", async () => {
-    const { server, cases, merchants } = surface()
-    const opaqueId = "mer_1"
-    const tag = hexOf(merchantTagOf(issuerSecret, opaqueId))
+  for (const opaqueId of ["mer_1", " ", "商".repeat(128), "😀".repeat(128)]) {
+    it(`opens opaque merchant principal ID ${JSON.stringify(opaqueId)} returned by the list`, async () => {
+      const { server, cases, merchants } = surface()
+      const tag = hexOf(merchantTagOf(issuerSecret, opaqueId))
 
-    cases.tags.set(tag, opaqueId)
-    merchants.profiles.set(opaqueId, { storeName: "Warung Pojok", status: "verified" })
-    cases.details.set(tag, {
-      merchantTag: tag,
-      confirmedCount: 1,
-      pendingCount: 0,
-      totalCount: 1,
-      windowCount: 1,
-      earliestWindow: 202611,
-      latestWindow: 202611,
-      firstReportedAt: new Date("2026-11-05T12:00:00Z"),
-      latestReportedAt: new Date("2026-11-05T12:00:00Z"),
-      categories: [{ slug: "fraud", label: "Fraud or misrepresentation", count: 1 }],
-      reports: []
+      cases.tags.set(tag, opaqueId)
+      merchants.profiles.set(opaqueId, { storeName: "Warung Pojok", status: "verified" })
+      cases.details.set(tag, {
+        merchantTag: tag,
+        confirmedCount: 1,
+        pendingCount: 0,
+        totalCount: 1,
+        windowCount: 1,
+        earliestWindow: 202611,
+        latestWindow: 202611,
+        firstReportedAt: new Date("2026-11-05T12:00:00Z"),
+        latestReportedAt: new Date("2026-11-05T12:00:00Z"),
+        categories: [{ slug: "fraud", label: "Fraud or misrepresentation", count: 1 }],
+        reports: []
+      })
+
+      const listed = await server.inject({ method: "GET", url: route, headers: { authorization: adminToken } })
+
+      assert.equal(listed.statusCode, 200)
+      assert.equal(listed.json().cases[0].merchantPrincipalId, opaqueId)
+
+      const detail = await server.inject({
+        method: "GET",
+        url: `${route}/${encodeURIComponent(opaqueId)}`,
+        headers: { authorization: adminToken }
+      })
+
+      assert.equal(detail.statusCode, 200)
+      assert.equal(detail.json().merchantPrincipalId, opaqueId)
+      assert.equal(detail.json().merchant.storeName, "Warung Pojok")
     })
+  }
 
-    const detail = await server.inject({
+  it("rejects merchant IDs longer than the database allows before querying cases", async () => {
+    const { server, cases } = surface()
+
+    async function rejectCaseLookup(): Promise<undefined> {
+      throw new Error("an oversized ID must not reach the case store")
+    }
+
+    cases.findCase = rejectCaseLookup
+
+    const response = await server.inject({
       method: "GET",
-      url: `${route}/${opaqueId}`,
+      url: `${route}/${"a".repeat(129)}`,
       headers: { authorization: adminToken }
     })
 
-    assert.equal(detail.statusCode, 200)
-    assert.equal(detail.json().merchantPrincipalId, opaqueId)
-    assert.equal(detail.json().merchant.storeName, "Warung Pojok")
+    assert.equal(response.statusCode, 404)
+    assert.equal(response.json().error, "CASE_NOT_FOUND")
   })
 })

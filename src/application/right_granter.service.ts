@@ -40,17 +40,24 @@ class RightGranter {
     this.running = true
 
     try {
+      const { store, logger } = this
+      const clock = this.clock.bind(this)
+
       await settleGenerationQueue({
         generations: this.generations,
-        queue: (generation) => this.store.queueAll(generation, this.clock()),
-        onQueued: (generation, count) => {
-          this.logger.info({
+        queue: function (generation) {
+          return store.queueAll(generation, clock())
+        },
+        onQueued: function (generation, count) {
+          logger.info({
             message: "report rights were queued for granting",
             fields: { generation, count }
           })
         },
-        nextUnsettled: (generation) => this.store.nextUnsettled(generation),
-        settleOne: (active, next) => this.settleOne(active, next)
+        nextUnsettled: function (generation) {
+          return store.nextUnsettled(generation)
+        },
+        settleOne: this.settleOne.bind(this)
       })
     } finally {
       this.running = false

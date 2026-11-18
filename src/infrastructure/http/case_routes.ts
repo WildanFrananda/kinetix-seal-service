@@ -121,7 +121,7 @@ function registerCaseRoutes(server: FastifyInstance, dependencies: CaseRouteDepe
 
       const { merchantId } = request.params
 
-      if (merchantId.trim() === "" || merchantId.length > 128) {
+      if (merchantId === "" || [...merchantId].length > 128) {
         return reply.code(404).send(problem("CASE_NOT_FOUND", "no reports for that merchant", request.id))
       }
 
