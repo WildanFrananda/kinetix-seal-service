@@ -1,13 +1,6 @@
-import type { RegistryGeneration } from "../types/registry_generation.type.ts"
-import type { RegistryGenerationStorePort } from "./ports/registry_generation_store.port.ts"
+import type { SettleGenerationQueueOptions } from "../types/settle_generation_queue_options.type.ts"
 
-async function settleGenerationQueue<T>(options: {
-  generations: RegistryGenerationStorePort
-  queue: (generation: number) => Promise<number>
-  onQueued: (generation: number, count: number) => void
-  nextUnsettled: (generation: number) => Promise<T | undefined>
-  settleOne: (active: RegistryGeneration, item: T) => Promise<boolean>
-}): Promise<void> {
+async function settleGenerationQueue<T>(options: SettleGenerationQueueOptions<T>): Promise<void> {
   const active = (await options.generations.unretired()).find((generation) => generation.status === "active")
 
   if (active === undefined) {

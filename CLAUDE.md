@@ -59,9 +59,11 @@ test. It refuses to start without the toolchain's database: a skipped database t
   `rewriteRelativeImportExtensions` emits `.js`.
 - **Zero comments** in code. Reasoning that needs prose goes here or in a test name.
 - **Functions are declared with `function`** (the user's rule, 2026-10-22, *"jangan pake arrow function pake
-  function, kecuali callback boleh pake anonymous function"*). An arrow is only an anonymous callback passed as an
-  argument (`.map((x) => …)`, a route handler, `.then(…)`). It is never a value bound to a name, a class field or
-  a property. `biome-plugins/no_arrow_definitions.grit` enforces this.
+  function, kecuali callback boleh pake anonymous function"*, clarified 2026-11-18 to allow anonymous arrows as
+  callback properties inside object literals). An arrow is an anonymous callback passed as an argument
+  (`.map((x) => …)`, a route handler, `.then(…)`) or as a callback property inside an options object literal. It is
+  never a value bound to a name (`const fn = () => …`) or a class field. `biome-plugins/no_arrow_definitions.grit`
+  enforces this.
 - **Exports go at the bottom of the file, as in identity** (*"export selalu di bawah file seperti identity"*):
   - a class: `export default ClassName`, imported as `import ClassName from`;
   - functions and constants: `export { a, b }`;

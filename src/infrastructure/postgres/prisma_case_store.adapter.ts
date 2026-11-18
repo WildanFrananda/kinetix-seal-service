@@ -11,7 +11,7 @@ import type { CaseStatusFilter } from "../../types/case_status_filter.type.ts"
 import type { CaseTagMappingRow } from "../../types/case_tag_mapping_row.type.ts"
 import type { StoredCaseAggregate } from "../../types/stored_case_aggregate.type.ts"
 import type { StoredCaseDetail } from "../../types/stored_case_detail.type.ts"
-import type { PrismaClient } from "./generated/client.ts"
+import type { Prisma, PrismaClient } from "./generated/client.ts"
 
 class PrismaCaseStore implements CaseStorePort {
   private readonly prisma: PrismaClient
@@ -23,15 +23,23 @@ class PrismaCaseStore implements CaseStorePort {
   }
 
   async listCases(status: CaseStatusFilter): Promise<StoredCaseAggregate[]> {
-    const matched = (await this.queryAggregates(null)).filter((row) => this.matchesStatus(row, status))
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const matched = (await this.queryAggregates(transaction, null)).filter((row) => this.matchesStatus(row, status))
 
-    if (matched.length === 0) {
-      return []
-    }
+        if (matched.length === 0) {
+          return []
+        }
 
-    const categoriesByTag = await this.queryCategoryTallies(matched.map((row) => row.merchant_tag))
+        const categoriesByTag = await this.queryCategoryTallies(
+          transaction,
+          matched.map((row) => row.merchant_tag)
+        )
 
-    return matched.map((row) => this.aggregateFrom(row, categoriesByTag.get(row.merchant_tag) ?? []))
+        return matched.map((row) => this.aggregateFrom(row, categoriesByTag.get(row.merchant_tag) ?? []))
+      },
+      { isolationLevel: "RepeatableRead" }
+    )
   }
 
   async resolveMerchants(merchantTags: readonly string[]): Promise<ReadonlyMap<string, string>> {
@@ -78,39 +86,44 @@ class PrismaCaseStore implements CaseStorePort {
   }
 
   async findCase(merchantTag: string, status: CaseStatusFilter): Promise<StoredCaseDetail | undefined> {
-    const aggregateRow = (await this.queryAggregates(merchantTag))[0]
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const aggregateRow = (await this.queryAggregates(transaction, merchantTag))[0]
 
-    if (aggregateRow === undefined) {
-      return undefined
-    }
+        if (aggregateRow === undefined) {
+          return undefined
+        }
 
-    const statusValue = status === "all" ? null : status
-    const [categoriesByTag, reportRows] = await Promise.all([
-      this.queryCategoryTallies([merchantTag]),
-      this.prisma.$queryRaw<CaseDetailReportRow[]>`
-        SELECT
-          fr.nullifier AS nullifier,
-          rc.slug AS category_slug,
-          rc.label AS category_label,
-          fr.body AS body,
-          fr."window" AS window,
-          fr.status AS status,
-          fr.first_generation AS first_generation,
-          fr.tx_id AS tx_id,
-          fr.submitted_at AS submitted_at,
-          fr.confirmed_at AS confirmed_at
-        FROM filed_reports AS fr
-        INNER JOIN report_categories AS rc ON rc.slug = fr.category_slug
-        WHERE fr.merchant_tag = ${merchantTag}
-          AND (${statusValue}::text IS NULL OR fr.status = ${statusValue})
-        ORDER BY fr.submitted_at DESC, fr.nullifier ASC
-      `
-    ])
+        const statusValue = status === "all" ? null : status
+        const [categoriesByTag, reportRows] = await Promise.all([
+          this.queryCategoryTallies(transaction, [merchantTag]),
+          transaction.$queryRaw<CaseDetailReportRow[]>`
+            SELECT
+              fr.nullifier AS nullifier,
+              rc.slug AS category_slug,
+              rc.label AS category_label,
+              fr.body AS body,
+              fr."window" AS window,
+              fr.status AS status,
+              fr.first_generation AS first_generation,
+              fr.tx_id AS tx_id,
+              fr.submitted_at AS submitted_at,
+              fr.confirmed_at AS confirmed_at
+            FROM filed_reports AS fr
+            INNER JOIN report_categories AS rc ON rc.slug = fr.category_slug
+            WHERE fr.merchant_tag = ${merchantTag}
+              AND (${statusValue}::text IS NULL OR fr.status = ${statusValue})
+            ORDER BY fr.submitted_at DESC, fr.nullifier ASC
+          `
+        ])
 
-    return {
-      ...this.aggregateFrom(aggregateRow, categoriesByTag.get(merchantTag) ?? []),
-      reports: reportRows.map((row) => this.reportFrom(row))
-    }
+        return {
+          ...this.aggregateFrom(aggregateRow, categoriesByTag.get(merchantTag) ?? []),
+          reports: reportRows.map((row) => this.reportFrom(row))
+        }
+      },
+      { isolationLevel: "RepeatableRead" }
+    )
   }
 
   private matchesStatus(row: CaseAggregateRow, status: CaseStatusFilter): boolean {
@@ -157,8 +170,11 @@ class PrismaCaseStore implements CaseStorePort {
     }
   }
 
-  private async queryAggregates(merchantTag: string | null): Promise<CaseAggregateRow[]> {
-    return this.prisma.$queryRaw<CaseAggregateRow[]>`
+  private async queryAggregates(
+    transaction: Prisma.TransactionClient,
+    merchantTag: string | null
+  ): Promise<CaseAggregateRow[]> {
+    return transaction.$queryRaw<CaseAggregateRow[]>`
       SELECT
         fr.merchant_tag AS merchant_tag,
         COUNT(*) FILTER (WHERE fr.status = 'confirmed') AS confirmed_count,
@@ -176,8 +192,11 @@ class PrismaCaseStore implements CaseStorePort {
     `
   }
 
-  private async queryCategoryTallies(tags: readonly string[]): Promise<Map<string, CaseCategoryTally[]>> {
-    const rows = await this.prisma.$queryRaw<CaseCategoryRow[]>`
+  private async queryCategoryTallies(
+    transaction: Prisma.TransactionClient,
+    tags: readonly string[]
+  ): Promise<Map<string, CaseCategoryTally[]>> {
+    const rows = await transaction.$queryRaw<CaseCategoryRow[]>`
       SELECT
         fr.merchant_tag AS merchant_tag,
         rc.slug AS slug,

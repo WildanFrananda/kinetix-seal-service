@@ -8,6 +8,7 @@ import {
 import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
 import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
 
+import type { CallRegistryCircuitOptions } from "../../types/call_registry_circuit_options.type.ts"
 import type { MidnightCredentialChainDependencies } from "../../types/midnight_credential_chain_dependencies.type.ts"
 import type { RegistryReceipt } from "../../types/registry_receipt.type.ts"
 import { withTimeout } from "../scheduling/with_timeout.ts"
@@ -33,15 +34,9 @@ async function readContractLedger<L>(
   return decode(state.contractState.deserialize({ v9: ContractState }).data)
 }
 
-async function callRegistryCircuit<C extends CompactContract.Any, K extends string>(options: {
-  dependencies: MidnightCredentialChainDependencies
-  compiledContract: unknown
-  contractAddress: string
-  circuitId: K
-  args: readonly unknown[]
-  label: string
-  what: string
-}): Promise<RegistryReceipt> {
+async function callRegistryCircuit<C extends CompactContract.Any, K extends string>(
+  options: CallRegistryCircuitOptions<K>
+): Promise<RegistryReceipt> {
   const { zkConfig, issuerSecret, config, publicData, networkStepSeconds } = options.dependencies
   const states = await withTimeout(
     getPublicStates(publicData, options.contractAddress),

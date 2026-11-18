@@ -128,7 +128,7 @@ describe("the case routes", () => {
 
     const nonUuid = await server.inject({
       method: "GET",
-      url: `${route}/not-a-uuid`,
+      url: `${route}/mer_1`,
       headers: { authorization: adminToken }
     })
 
@@ -146,5 +146,37 @@ describe("the case routes", () => {
     assert.equal(nonUuid.statusCode, 404)
     assert.equal(notFound.statusCode, 404)
     assert.equal(notFound.json().error, "CASE_NOT_FOUND")
+  })
+
+  it("opens opaque non-UUID merchant principal IDs returned by the list", async () => {
+    const { server, cases, merchants } = surface()
+    const opaqueId = "mer_1"
+    const tag = hexOf(merchantTagOf(issuerSecret, opaqueId))
+
+    cases.tags.set(tag, opaqueId)
+    merchants.profiles.set(opaqueId, { storeName: "Warung Pojok", status: "verified" })
+    cases.details.set(tag, {
+      merchantTag: tag,
+      confirmedCount: 1,
+      pendingCount: 0,
+      totalCount: 1,
+      windowCount: 1,
+      earliestWindow: 202611,
+      latestWindow: 202611,
+      firstReportedAt: new Date("2026-11-05T12:00:00Z"),
+      latestReportedAt: new Date("2026-11-05T12:00:00Z"),
+      categories: [{ slug: "fraud", label: "Fraud or misrepresentation", count: 1 }],
+      reports: []
+    })
+
+    const detail = await server.inject({
+      method: "GET",
+      url: `${route}/${opaqueId}`,
+      headers: { authorization: adminToken }
+    })
+
+    assert.equal(detail.statusCode, 200)
+    assert.equal(detail.json().merchantPrincipalId, opaqueId)
+    assert.equal(detail.json().merchant.storeName, "Warung Pojok")
   })
 })

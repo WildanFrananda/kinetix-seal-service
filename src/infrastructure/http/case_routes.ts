@@ -6,7 +6,6 @@ import type { CaseRouteDependencies } from "../../types/case_route_dependencies.
 import type { CaseStatusFilter } from "../../types/case_status_filter.type.ts"
 import type { CaseSummary } from "../../types/case_summary.type.ts"
 import { callerOf } from "./caller_of.ts"
-import { isLowercaseUuid } from "./lowercase_uuid.ts"
 import { problem } from "./problem.ts"
 import { seedRouteMetrics } from "./seed_route_metrics.ts"
 
@@ -122,7 +121,7 @@ function registerCaseRoutes(server: FastifyInstance, dependencies: CaseRouteDepe
 
       const { merchantId } = request.params
 
-      if (!isLowercaseUuid(merchantId)) {
+      if (merchantId.trim() === "" || merchantId.length > 128) {
         return reply.code(404).send(problem("CASE_NOT_FOUND", "no reports for that merchant", request.id))
       }
 

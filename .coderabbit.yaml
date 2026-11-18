@@ -12,7 +12,7 @@ reviews:
       instructions: |
         - Enforce AGENTS.md strictly: every type alias belongs in `src/types/*.type.ts` (one type per file), never inline inside class, service, or adapter files.
         - Flag any module-level helper functions inside files that define a class.
-        - Flag any code comments, `any`, non-null assertions (`!`), named arrow functions (`const fn = () =>`), inline exports (exports must sit at the bottom of the file), or `#private` syntax (must use explicit `private`).
+        - Flag any code comments, `any`, non-null assertions (`!`), named arrow bindings (`const fn = () =>`), class field arrows, inline exports (exports must sit at the bottom of the file), or `#private` syntax (must use explicit `private`). Anonymous arrow functions inside object-literal callback properties are allowed.
         - Flag any hardcoded fallback secrets, environment defaults, or mocked/dummy production logic.
     - path: "src/domain/**"
       instructions: |

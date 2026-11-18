@@ -15,6 +15,8 @@ const unknownMerchant: MerchantInfo = {
   status: null
 }
 
+const merchantLookupConcurrency = 8
+
 class CaseCatalogue {
   private readonly dependencies: CaseCatalogueDependencies
 
@@ -40,7 +42,7 @@ class CaseCatalogue {
       return principalId === undefined ? [] : [{ aggregate, principalId }]
     })
 
-    const profiles = await Promise.all(resolved.map((entry) => this.dependencies.merchants.find(entry.principalId)))
+    const profiles = await this.loadProfiles(resolved.map((entry) => entry.principalId))
 
     const cases = resolved
       .map((entry, index) => this.summaryFrom(entry.aggregate, entry.principalId, profiles[index]))
@@ -72,6 +74,19 @@ class CaseCatalogue {
     }
 
     return { kind: "found", detail }
+  }
+
+  private async loadProfiles(principalIds: readonly string[]): Promise<Array<MerchantInfo | undefined>> {
+    const profiles: Array<MerchantInfo | undefined> = []
+
+    for (let start = 0; start < principalIds.length; start += merchantLookupConcurrency) {
+      const batch = principalIds.slice(start, start + merchantLookupConcurrency)
+      const resolved = await Promise.all(batch.map((principalId) => this.dependencies.merchants.find(principalId)))
+
+      profiles.push(...resolved)
+    }
+
+    return profiles
   }
 
   private compareSummaries(left: CaseSummary, right: CaseSummary): number {

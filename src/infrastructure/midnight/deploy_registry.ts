@@ -3,20 +3,12 @@ import { createUnprovenDeployTxFromVerifierKeys } from "@midnight-ntwrk/midnight
 import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
 
 import type { DeployReceipt } from "../../types/deploy_receipt.type.ts"
-import type { MidnightRegistryChainDependencies } from "../../types/midnight_registry_chain_dependencies.type.ts"
+import type { PrepareRegistryDeployOptions } from "../../types/prepare_registry_deploy_options.type.ts"
 import type { PreparedDeploy } from "../../types/prepared_deploy.type.ts"
-import type { RegistryKind } from "../../types/registry_kind.type.ts"
 import { maintenanceSigningKey } from "./maintenance_signing_key.ts"
 import { submitSealTransaction } from "./submit_seal_transaction.ts"
 
-async function prepareRegistryDeploy(options: {
-  dependencies: MidnightRegistryChainDependencies
-  compiledContract: unknown
-  kind: RegistryKind
-  generation: number
-  issuerPublicKey: (secret: Uint8Array) => unknown
-  what: string
-}): Promise<PreparedDeploy> {
+async function prepareRegistryDeploy(options: PrepareRegistryDeployOptions): Promise<PreparedDeploy> {
   const { zkConfig, issuerSecret, config } = options.dependencies
   const zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
   const deploy = await createUnprovenDeployTxFromVerifierKeys(
