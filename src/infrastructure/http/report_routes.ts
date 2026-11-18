@@ -10,7 +10,8 @@ import type { ReporterRecord } from "../../types/reporter_record.type.ts"
 import type { ReporterView } from "../../types/reporter_view.type.ts"
 import { callerOf } from "./caller_of.ts"
 import { problem } from "./problem.ts"
-import { routeTemplate } from "./route_template.ts"
+import { seedRouteMetrics } from "./seed_route_metrics.ts"
+import { singleStringField } from "./single_string_field.ts"
 
 const reportersRoute = "/api/v1/seal/reporters"
 const rightsRoute = "/api/v1/seal/report-rights"
@@ -42,22 +43,16 @@ function rightViewOf(right: HeldRight): HeldRightView {
 }
 
 function reporterKeyOf(body: unknown): bigint | undefined {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return undefined
-  }
+  const value = singleStringField(body, "reporterKey")
 
-  const keys = Object.keys(body)
-
-  if (keys.length !== 1 || keys[0] !== "reporterKey" || !("reporterKey" in body)) {
-    return undefined
-  }
-
-  return typeof body.reporterKey === "string" ? parseReporterKey(body.reporterKey) : undefined
+  return value === undefined ? undefined : parseReporterKey(value)
 }
 
 function registerReportRoutes(server: FastifyInstance, dependencies: ReportRouteDependencies): void {
-  dependencies.metrics.httpRequests.inc({ method: "POST", route: routeTemplate(reportersRoute), status: "201" }, 0)
-  dependencies.metrics.httpRequests.inc({ method: "GET", route: routeTemplate(rightsRoute), status: "200" }, 0)
+  seedRouteMetrics(dependencies.metrics, [
+    { method: "POST", route: reportersRoute, status: "201" },
+    { method: "GET", route: rightsRoute, status: "200" }
+  ])
 
   server.post(reportersRoute, { bodyLimit: requestBodyLimit }, async (request, reply) => {
     reply.header("Cache-Control", "no-store")

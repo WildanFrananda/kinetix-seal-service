@@ -1,11 +1,3 @@
-import { randomBytes } from "node:crypto"
-import { ContractState } from "@midnight-ntwrk/compact-runtime"
-import {
-  createUnprovenCallTxFromInitialStates,
-  getPublicStates,
-  type Ledger9CallOptionsWithPrivateState
-} from "@midnight-ntwrk/midnight-js-contracts"
-import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
 import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
 
 import { type Ledger, ledger, pureCircuits } from "#contracts/report_registry/contract/index.js"
@@ -17,12 +9,12 @@ import type { RegistryReceipt } from "../../types/registry_receipt.type.ts"
 import type { ReportRegistryCircuitId } from "../../types/report_registry_circuit_id.type.ts"
 import type { ReportRegistryContract } from "../../types/report_registry_contract.type.ts"
 import type { RightLeafParts } from "../../types/right_leaf_parts.type.ts"
-import { withTimeout } from "../scheduling/with_timeout.ts"
 import { issuedLeafIndex } from "./issued_leaf_index.ts"
+import { callRegistryCircuit, readContractLedger } from "./registry_circuit_client.ts"
 import { compileReportRegistry } from "./report_registry_contract.ts"
-import { submitSealTransaction } from "./submit_seal_transaction.ts"
 
 const compiledContract = compileReportRegistry()
+const registryLabel = "the report registry"
 
 class MidnightReportChain implements ReportChainPort {
   private readonly dependencies: MidnightCredentialChainDependencies
@@ -77,18 +69,7 @@ class MidnightReportChain implements ReportChainPort {
   }
 
   private async registryLedger(contractAddress: string): Promise<Ledger> {
-    const { publicData, networkStepSeconds } = this.dependencies
-    const state = await withTimeout(
-      publicData.queryContractState(contractAddress),
-      networkStepSeconds,
-      "reading the report registry"
-    )
-
-    if (state === null) {
-      throw new Error(`the report registry ${contractAddress} has no state`)
-    }
-
-    return ledger(state.contractState.deserialize({ v9: ContractState }).data)
+    return readContractLedger(this.dependencies, contractAddress, (data) => ledger(data as never), registryLabel)
   }
 
   private async call<K extends ReportRegistryCircuitId>(
@@ -97,31 +78,15 @@ class MidnightReportChain implements ReportChainPort {
     args: CompactContract.CircuitParameters<ReportRegistryContract, K>,
     what: string
   ): Promise<RegistryReceipt> {
-    const { zkConfig, issuerSecret, config, publicData, networkStepSeconds } = this.dependencies
-    const states = await withTimeout(
-      getPublicStates(publicData, contractAddress),
-      networkStepSeconds,
-      "reading the report registry"
-    )
-
-    const zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
-    const options = {
+    return callRegistryCircuit<ReportRegistryContract, K>({
+      dependencies: this.dependencies,
       compiledContract,
-      circuitId,
       contractAddress,
+      circuitId,
       args,
-      coinPublicKey: zswap.coinPublicKey,
-      initialContractState: states.contractState,
-      initialZswapChainState: states.zswapChainState,
-      ledgerParameters: states.ledgerParameters,
-      initialPrivateState: { role: "issuer", issuerSecret },
-      config
-    } as Ledger9CallOptionsWithPrivateState<ReportRegistryContract, K>
-
-    const call = await createUnprovenCallTxFromInitialStates(zkConfig, options, zswap.encryptionPublicKey)
-    const confirmed = await submitSealTransaction(this.dependencies, call.private.unprovenTx, what)
-
-    return { txId: confirmed.txId }
+      label: registryLabel,
+      what
+    })
   }
 }
 

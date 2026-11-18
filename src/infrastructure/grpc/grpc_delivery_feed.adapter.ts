@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf"
 import { timestampDate } from "@bufbuild/protobuf/wkt"
-import { Client } from "@grpc/grpc-js"
+import type { Client } from "@grpc/grpc-js"
 import {
   DeliveriesSinceRequestSchema,
   DeliveryEvidenceService
@@ -14,7 +14,7 @@ import type { LogCursor } from "../../types/log_cursor.type.ts"
 import type { MeshIdentity } from "../../types/mesh_identity.type.ts"
 import { feedFailureOf } from "./feed_failure_of.ts"
 import { fromWireCursor, toWireCursor } from "./log_cursor_wire.ts"
-import { meshChannelCredentials } from "./mesh_channel_credentials.ts"
+import { meshGrpcClient } from "./mesh_grpc_client.ts"
 import { unaryCall } from "./unary_call.ts"
 
 const peer = "matching"
@@ -24,7 +24,7 @@ class GrpcDeliveryFeed implements DeliveryFeedPort {
   private readonly timeoutSeconds: number
 
   constructor(address: string, identity: MeshIdentity, timeoutSeconds: number) {
-    this.client = new Client(address, meshChannelCredentials(identity, peer))
+    this.client = meshGrpcClient(address, identity, peer)
     this.timeoutSeconds = timeoutSeconds
   }
 

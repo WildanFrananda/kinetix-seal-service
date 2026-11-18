@@ -1,3 +1,4 @@
+import { bytesOf, hexOf } from "../domain/hex.ts"
 import type { OnChainFiledReport } from "../types/on_chain_filed_report.type.ts"
 import type { ReportKeeperDependencies } from "../types/report_keeper_dependencies.type.ts"
 import type { FiledReportStorePort } from "./ports/filed_report_store.port.ts"
@@ -46,7 +47,7 @@ class ReportKeeper {
     const byNullifier = new Map<string, OnChainFiledReport>()
 
     for (const item of onChain) {
-      byNullifier.set(Buffer.from(item.nullifier).toString("hex"), item)
+      byNullifier.set(hexOf(item.nullifier), item)
     }
 
     for (const row of submitted) {
@@ -56,7 +57,7 @@ class ReportKeeper {
         continue
       }
 
-      if (Buffer.from(matched.digest).toString("hex") !== row.digest) {
+      if (hexOf(matched.digest) !== row.digest) {
         continue
       }
 
@@ -73,9 +74,9 @@ class ReportKeeper {
         return
       }
 
-      const nullifierBytes = new Uint8Array(Buffer.from(next.nullifier, "hex"))
-      const merchantTagBytes = new Uint8Array(Buffer.from(next.merchantTag, "hex"))
-      const digestBytes = new Uint8Array(Buffer.from(next.digest, "hex"))
+      const nullifierBytes = bytesOf(next.nullifier)
+      const merchantTagBytes = bytesOf(next.merchantTag)
+      const digestBytes = bytesOf(next.digest)
 
       if (next.status === "uncertain") {
         const present = await this.chain.hasReport(contractAddress, nullifierBytes)

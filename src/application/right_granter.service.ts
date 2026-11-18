@@ -5,6 +5,7 @@ import type { RegistryGenerationStorePort } from "./ports/registry_generation_st
 import type { ReportChainPort } from "./ports/report_chain.port.ts"
 import type { ReportMetricsPort } from "./ports/report_metrics.port.ts"
 import type { ReportRightStorePort } from "./ports/report_right_store.port.ts"
+import { settleGenerationQueue } from "./settle_generation_queue.ts"
 
 class RightGranter {
   private readonly chain: ReportChainPort
@@ -39,34 +40,20 @@ class RightGranter {
     this.running = true
 
     try {
-      await this.settleQueue()
+      await settleGenerationQueue({
+        generations: this.generations,
+        queue: (generation) => this.store.queueAll(generation, this.clock()),
+        onQueued: (generation, count) => {
+          this.logger.info({
+            message: "report rights were queued for granting",
+            fields: { generation, count }
+          })
+        },
+        nextUnsettled: (generation) => this.store.nextUnsettled(generation),
+        settleOne: (active, next) => this.settleOne(active, next)
+      })
     } finally {
       this.running = false
-    }
-  }
-
-  private async settleQueue(): Promise<void> {
-    const active = (await this.generations.unretired()).find((generation) => generation.status === "active")
-
-    if (active === undefined) {
-      return
-    }
-
-    const queued = await this.store.queueAll(active.generation, this.clock())
-
-    if (queued > 0) {
-      this.logger.info({
-        message: "report rights were queued for granting",
-        fields: { generation: active.generation, count: queued }
-      })
-    }
-
-    for (;;) {
-      const next = await this.store.nextUnsettled(active.generation)
-
-      if (next === undefined || !(await this.settleOne(active, next))) {
-        return
-      }
     }
   }
 

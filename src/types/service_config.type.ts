@@ -20,6 +20,7 @@ type ServiceConfig = {
   facts: FactsConfig
   sponsor: SponsorLinkConfig
   identity: IdentityTokenConfig
+  identityServiceAddress: string
   credentials: CredentialsConfig
   predicates: PredicatesConfig
   reports: ReportsConfig

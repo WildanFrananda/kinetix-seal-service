@@ -8,7 +8,8 @@ import type { CredentialView } from "../../types/credential_view.type.ts"
 import { callerOf } from "./caller_of.ts"
 import { isLowercaseUuid } from "./lowercase_uuid.ts"
 import { problem } from "./problem.ts"
-import { routeTemplate } from "./route_template.ts"
+import { seedRouteMetrics } from "./seed_route_metrics.ts"
+import { singleStringField } from "./single_string_field.ts"
 
 const collectionRoute = "/api/v1/seal/courier-credentials"
 const memberRoute = "/api/v1/seal/courier-credentials/:id"
@@ -41,22 +42,16 @@ function viewOf(status: CredentialStatus): CredentialView {
 }
 
 function holderPublicKeyOf(body: unknown): bigint | undefined {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    return undefined
-  }
+  const value = singleStringField(body, "holderPublicKey")
 
-  const keys = Object.keys(body)
-
-  if (keys.length !== 1 || keys[0] !== "holderPublicKey" || !("holderPublicKey" in body)) {
-    return undefined
-  }
-
-  return typeof body.holderPublicKey === "string" ? parseHolderPublicKey(body.holderPublicKey) : undefined
+  return value === undefined ? undefined : parseHolderPublicKey(value)
 }
 
 function registerCredentialRoutes(server: FastifyInstance, dependencies: CredentialRouteDependencies): void {
-  dependencies.metrics.httpRequests.inc({ method: "POST", route: routeTemplate(collectionRoute), status: "202" }, 0)
-  dependencies.metrics.httpRequests.inc({ method: "GET", route: routeTemplate(memberRoute), status: "200" }, 0)
+  seedRouteMetrics(dependencies.metrics, [
+    { method: "POST", route: collectionRoute, status: "202" },
+    { method: "GET", route: memberRoute, status: "200" }
+  ])
 
   server.post(collectionRoute, { bodyLimit: requestBodyLimit }, async (request, reply) => {
     reply.header("Cache-Control", "no-store")

@@ -1,7 +1,6 @@
-import FeedCallFailure from "../domain/feed_call_failure.ts"
-import { feedPageViolation } from "../domain/feed_page_violation.ts"
 import type { DeliveredOrder } from "../types/delivered_order.type.ts"
 import type { FeedLimits } from "../types/feed_limits.type.ts"
+import { drainFeedStream } from "./drain_feed.ts"
 import type { DeliveredOrderStorePort } from "./ports/delivered_order_store.port.ts"
 import type { FeedMetricsPort } from "./ports/feed_metrics.port.ts"
 import type { LoggerPort } from "./ports/logger.port.ts"
@@ -37,56 +36,26 @@ class DeliveredOrders {
     this.running = true
 
     try {
-      for (let pages = 0; pages < this.limits.pagesPerTick; pages += 1) {
-        const more = await this.pull().catch((error: unknown) => {
-          this.failed(error)
+      await drainFeedStream({
+        stream: "orders",
+        limits: this.limits,
+        metrics: this.metrics,
+        logger: this.logger,
+        cursor: () => this.store.cursor(),
+        fetch: (after, limit) => this.feed.eventsSince(after, limit),
+        record: async (after, page) => {
+          const deliveries = page.records.flatMap((record): DeliveredOrder[] =>
+            record.delivery === undefined ? [] : [record.delivery]
+          )
 
-          return false
-        })
+          await this.store.recordDelivered(after, page.next, deliveries, !page.hasMore)
 
-        if (!more) {
-          return
+          return deliveries.length
         }
-      }
+      })
     } finally {
       this.running = false
     }
-  }
-
-  private async pull(): Promise<boolean> {
-    const after = await this.store.cursor()
-    const page = await this.feed.eventsSince(after, this.limits.pageSize)
-    const violation = feedPageViolation(after, this.limits.pageSize, page)
-
-    if (violation !== undefined) {
-      throw new FeedCallFailure("invalid_page", violation)
-    }
-
-    const deliveries = page.records.flatMap((record): DeliveredOrder[] =>
-      record.delivery === undefined ? [] : [record.delivery]
-    )
-
-    await this.store.recordDelivered(after, page.next, deliveries, !page.hasMore)
-    this.metrics.recorded("orders", deliveries.length)
-
-    return page.hasMore
-  }
-
-  private failed(error: unknown): void {
-    const kind = error instanceof FeedCallFailure ? error.kind : "store"
-
-    this.metrics.failed("orders", kind)
-
-    if (kind === "unavailable") {
-      this.logger.warn({
-        message: "a fact feed is unavailable; it is read again on the next tick",
-        fields: { stream: "orders", cause: error instanceof Error ? error.message : String(error) }
-      })
-
-      return
-    }
-
-    this.logger.error({ message: "a fact feed stopped short", fields: { stream: "orders", kind } }, error)
   }
 }
 
