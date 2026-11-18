@@ -5,6 +5,7 @@ import type { CredentialMetricsPort } from "./ports/credential_metrics.port.ts"
 import type { CredentialStorePort } from "./ports/credential_store.port.ts"
 import type { LoggerPort } from "./ports/logger.port.ts"
 import type { RegistryGenerationStorePort } from "./ports/registry_generation_store.port.ts"
+import { settleGenerationQueue } from "./settle_generation_queue.ts"
 
 class CredentialIssuer {
   private readonly chain: CredentialChainPort
@@ -39,34 +40,20 @@ class CredentialIssuer {
     this.running = true
 
     try {
-      await this.settleQueue()
+      await settleGenerationQueue({
+        generations: this.generations,
+        queue: (generation) => this.store.queueCurrent(generation, this.clock()),
+        onQueued: (generation, count) => {
+          this.logger.info({
+            message: "credentials were queued for issuance",
+            fields: { generation, count }
+          })
+        },
+        nextUnsettled: (generation) => this.store.nextUnsettled(generation),
+        settleOne: (active, next) => this.settleOne(active, next)
+      })
     } finally {
       this.running = false
-    }
-  }
-
-  private async settleQueue(): Promise<void> {
-    const active = (await this.generations.unretired()).find((generation) => generation.status === "active")
-
-    if (active === undefined) {
-      return
-    }
-
-    const queued = await this.store.queueCurrent(active.generation, this.clock())
-
-    if (queued > 0) {
-      this.logger.info({
-        message: "credentials were queued for issuance",
-        fields: { generation: active.generation, count: queued }
-      })
-    }
-
-    for (;;) {
-      const next = await this.store.nextUnsettled(active.generation)
-
-      if (next === undefined || !(await this.settleOne(active, next))) {
-        return
-      }
     }
   }
 

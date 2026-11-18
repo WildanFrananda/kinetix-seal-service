@@ -1,6 +1,6 @@
 import { create } from "@bufbuild/protobuf"
 import { timestampDate } from "@bufbuild/protobuf/wkt"
-import { Client } from "@grpc/grpc-js"
+import type { Client } from "@grpc/grpc-js"
 import { OrderStatus } from "kinetix-contracts/src/common/v1/common_pb.js"
 import {
   type LifecycleEvent,
@@ -18,7 +18,7 @@ import type { MeshIdentity } from "../../types/mesh_identity.type.ts"
 import type { OrderLifecycleRecord } from "../../types/order_lifecycle_record.type.ts"
 import { feedFailureOf } from "./feed_failure_of.ts"
 import { fromWireCursor, toWireCursor } from "./log_cursor_wire.ts"
-import { meshChannelCredentials } from "./mesh_channel_credentials.ts"
+import { meshGrpcClient } from "./mesh_grpc_client.ts"
 import { unaryCall } from "./unary_call.ts"
 
 const peer = "order"
@@ -60,7 +60,7 @@ class GrpcOrderLifecycleFeed implements OrderLifecycleFeedPort {
   private readonly timeoutSeconds: number
 
   constructor(address: string, identity: MeshIdentity, timeoutSeconds: number) {
-    this.client = new Client(address, meshChannelCredentials(identity, peer))
+    this.client = meshGrpcClient(address, identity, peer)
     this.timeoutSeconds = timeoutSeconds
   }
 

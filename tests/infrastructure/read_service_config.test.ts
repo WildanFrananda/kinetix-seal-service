@@ -33,6 +33,7 @@ const complete: NodeJS.ProcessEnv = {
   JWT_ISSUER: "https://identity.kinetix.local",
   JWT_AUDIENCE: "kinetix",
   KINETIX_SEAL_JWKS_TIMEOUT_SECONDS: "10",
+  KINETIX_SEAL_IDENTITY_GRPC_ADDR: "kinetix-identity-service:50052",
   KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS: "30",
   KINETIX_SEAL_REPORT_GRANT_SECONDS: "30",
   KINETIX_SEAL_REPORT_MINIMUM_HOLDERS: "20",
@@ -71,6 +72,7 @@ describe("reading the service's configuration", () => {
     })
 
     assert.equal(config.facts.orderAddress, "kinetix-order-service:50055")
+    assert.equal(config.identityServiceAddress, "kinetix-identity-service:50052")
   })
 
   it("needs the predicate settings, a period of at most a year", () => {

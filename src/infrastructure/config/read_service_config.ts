@@ -42,6 +42,7 @@ function readServiceConfig(env: NodeJS.ProcessEnv): ServiceConfig {
       audience: read.text("JWT_AUDIENCE"),
       timeoutSeconds: read.positiveInteger("KINETIX_SEAL_JWKS_TIMEOUT_SECONDS")
     },
+    identityServiceAddress: read.address("KINETIX_SEAL_IDENTITY_GRPC_ADDR"),
     credentials: {
       issueSeconds: read.positiveInteger("KINETIX_SEAL_CREDENTIAL_ISSUE_SECONDS"),
       factsMaxAgeSeconds: read.positiveInteger("KINETIX_SEAL_CREDENTIAL_FACTS_MAX_AGE_SECONDS")

@@ -1,13 +1,5 @@
-import { randomBytes } from "node:crypto"
-import { ContractState } from "@midnight-ntwrk/compact-runtime"
-import {
-  createUnprovenCallTxFromInitialStates,
-  getPublicStates,
-  type Ledger9CallOptionsWithPrivateState
-} from "@midnight-ntwrk/midnight-js-contracts"
-import { ZswapSecretKeys } from "@midnight-ntwrk/midnight-js-protocol/v9"
+import { getPublicStates } from "@midnight-ntwrk/midnight-js-contracts"
 import type { Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js"
-
 import { type Ledger, ledger, pureCircuits } from "#contracts/credential_registry/contract/index.js"
 import type { CredentialChainPort } from "../../application/ports/credential_chain.port.ts"
 import type { PredicateChainPort } from "../../application/ports/predicate_chain.port.ts"
@@ -27,9 +19,10 @@ import { credentialLeafOf } from "./credential_leaf.ts"
 import { compileCredentialRegistry } from "./credential_registry_contract.ts"
 import { issuedLeafIndex } from "./issued_leaf_index.ts"
 import { placedPredicatesOf } from "./placed_predicates.ts"
-import { submitSealTransaction } from "./submit_seal_transaction.ts"
+import { callRegistryCircuit, readContractLedger } from "./registry_circuit_client.ts"
 
 const compiledContract = compileCredentialRegistry()
+const registryLabel = "the registry"
 
 class MidnightCredentialChain
   implements CredentialChainPort, PredicateChainPort, PresentationLedgerPort, RegistrySnapshotSourcePort
@@ -94,18 +87,7 @@ class MidnightCredentialChain
   }
 
   private async registryLedger(contractAddress: string): Promise<Ledger> {
-    const { publicData, networkStepSeconds } = this.dependencies
-    const state = await withTimeout(
-      publicData.queryContractState(contractAddress),
-      networkStepSeconds,
-      "reading the registry"
-    )
-
-    if (state === null) {
-      throw new Error(`the registry ${contractAddress} has no state`)
-    }
-
-    return ledger(state.contractState.deserialize({ v9: ContractState }).data)
+    return readContractLedger(this.dependencies, contractAddress, (data) => ledger(data as never), registryLabel)
   }
 
   private async call<K extends RegistryCircuitId>(
@@ -114,31 +96,15 @@ class MidnightCredentialChain
     args: CompactContract.CircuitParameters<RegistryContract, K>,
     what: string
   ): Promise<RegistryReceipt> {
-    const { zkConfig, issuerSecret, config, publicData, networkStepSeconds } = this.dependencies
-    const states = await withTimeout(
-      getPublicStates(publicData, contractAddress),
-      networkStepSeconds,
-      "reading the registry"
-    )
-
-    const zswap = ZswapSecretKeys.fromSeed(randomBytes(32))
-    const options = {
+    return callRegistryCircuit<RegistryContract, K>({
+      dependencies: this.dependencies,
       compiledContract,
-      circuitId,
       contractAddress,
+      circuitId,
       args,
-      coinPublicKey: zswap.coinPublicKey,
-      initialContractState: states.contractState,
-      initialZswapChainState: states.zswapChainState,
-      ledgerParameters: states.ledgerParameters,
-      initialPrivateState: { role: "issuer", issuerSecret },
-      config
-    } as Ledger9CallOptionsWithPrivateState<RegistryContract, K>
-
-    const call = await createUnprovenCallTxFromInitialStates(zkConfig, options, zswap.encryptionPublicKey)
-    const confirmed = await submitSealTransaction(this.dependencies, call.private.unprovenTx, what)
-
-    return { txId: confirmed.txId }
+      label: registryLabel,
+      what
+    })
   }
 }
 

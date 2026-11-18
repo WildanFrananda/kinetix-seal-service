@@ -59,9 +59,11 @@ test. It refuses to start without the toolchain's database: a skipped database t
   `rewriteRelativeImportExtensions` emits `.js`.
 - **Zero comments** in code. Reasoning that needs prose goes here or in a test name.
 - **Functions are declared with `function`** (the user's rule, 2026-10-22, *"jangan pake arrow function pake
-  function, kecuali callback boleh pake anonymous function"*). An arrow is only an anonymous callback passed as an
-  argument (`.map((x) => …)`, a route handler, `.then(…)`). It is never a value bound to a name, a class field or
-  a property. `biome-plugins/no_arrow_definitions.grit` enforces this.
+  function, kecuali callback boleh pake anonymous function"*, clarified 2026-11-18 to allow anonymous arrows as
+  callback properties inside object literals). An arrow is an anonymous callback passed as an argument
+  (`.map((x) => …)`, a route handler, `.then(…)`) or as a callback property inside an options object literal. It is
+  never a value bound to a name (`const fn = () => …`) or a class field. `biome-plugins/no_arrow_definitions.grit`
+  enforces this.
 - **Exports go at the bottom of the file, as in identity** (*"export selalu di bawah file seperti identity"*):
   - a class: `export default ClassName`, imported as `import ClassName from`;
   - functions and constants: `export { a, b }`;
@@ -627,6 +629,6 @@ already serves the holder's page). No account and no token.
 
 - A gRPC server of seal's own: nothing calls seal over the mesh yet.
 - S1 for merchants (after payment's revenue feed, SEAL-D6), S2 sealed-bid auctions.
-- S3 beyond its rights: the report registry (S3a), its generations (S3b) and reporter keys and rights (S3c) exist; the
-  report route and the minimum crowd (S3d), cases (S3e), the courier app (S3f) and the lab run (S3g) do not (infra
-  `docs/SEAL-SERVICE.md` §9 and §11).
+- S3 beyond cases: the report registry (S3a), its generations (S3b), reporter keys and rights (S3c), the report route
+  and the minimum crowd (S3d), and the merchant cases endpoints (S3e) exist; the courier app (S3f) and the lab run
+  (S3g) do not (infra `docs/SEAL-SERVICE.md` §9 and §11).

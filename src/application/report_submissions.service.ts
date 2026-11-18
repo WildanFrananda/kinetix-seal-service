@@ -1,3 +1,4 @@
+import { hexOf } from "../domain/hex.ts"
 import { isReportBodyValid, reportDigestOf } from "../domain/report_digest.ts"
 import { matchingReportCall } from "../domain/report_shape.ts"
 import type { ReportCategory } from "../types/report_category.type.ts"
@@ -117,9 +118,9 @@ class ReportSubmissions {
       return this.fail({ kind: "digest_mismatch" })
     }
 
-    const nullifier = Buffer.from(call.nullifier).toString("hex")
-    const merchantTag = Buffer.from(call.merchantTag).toString("hex")
-    const digest = Buffer.from(call.digest).toString("hex")
+    const nullifier = hexOf(call.nullifier)
+    const merchantTag = hexOf(call.merchantTag)
+    const digest = hexOf(call.digest)
 
     if ((await this.reports.findByNullifier(nullifier)) !== undefined) {
       return this.fail({ kind: "already_reported" })

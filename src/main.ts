@@ -4,6 +4,7 @@ import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-p
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider"
 import { Registry } from "prom-client"
 
+import CaseCatalogue from "./application/case_catalogue.service.ts"
 import CourierCredentials from "./application/courier_credentials.service.ts"
 import CourierFacts from "./application/courier_facts.service.ts"
 import CredentialIssuer from "./application/credential_issuer.service.ts"
@@ -24,21 +25,16 @@ import ReporterRegistry from "./application/reporter_registry.service.ts"
 import RightGranter from "./application/right_granter.service.ts"
 import { presentationStatusMaxAgeSeconds } from "./domain/presentation_status_age.ts"
 import { registrySnapshotMaxAgeSeconds } from "./domain/registry_snapshot_age.ts"
+import { registerAllRoutes } from "./infrastructure/composition/register_all_routes.ts"
+import { repeatWhenSponsorReady, runLogged } from "./infrastructure/composition/run_task.ts"
 import { readServiceConfig } from "./infrastructure/config/read_service_config.ts"
 import GrpcDeliveryFeed from "./infrastructure/grpc/grpc_delivery_feed.adapter.ts"
+import GrpcMerchantInfo from "./infrastructure/grpc/grpc_merchant_info.adapter.ts"
 import GrpcOrderLifecycleFeed from "./infrastructure/grpc/grpc_order_lifecycle_feed.adapter.ts"
 import GrpcReviewFeed from "./infrastructure/grpc/grpc_review_feed.adapter.ts"
 import BundleAssets from "./infrastructure/http/bundle_assets.ts"
-import { registerCredentialRoutes } from "./infrastructure/http/credential_routes.ts"
-import { registerFiledReportRoutes } from "./infrastructure/http/filed_report_routes.ts"
-import { registerHolderRoutes } from "./infrastructure/http/holder_routes.ts"
 import { buildHttpServer } from "./infrastructure/http/http_server.ts"
 import KeyedIpRateLimiter from "./infrastructure/http/keyed_ip_rate_limiter.ts"
-import { registerPredicateRoutes } from "./infrastructure/http/predicate_routes.ts"
-import { registerPresentationRoutes } from "./infrastructure/http/presentation_routes.ts"
-import { registerRegistrySnapshotRoutes } from "./infrastructure/http/registry_snapshot_routes.ts"
-import { registerReportRoutes } from "./infrastructure/http/report_routes.ts"
-import { registerVerifierRoutes } from "./infrastructure/http/verifier_routes.ts"
 import JoseTokenVerifier from "./infrastructure/identity/jose_token_verifier.adapter.ts"
 import { loadMeshIdentity } from "./infrastructure/mesh/mesh_identity.ts"
 import { withProjectId } from "./infrastructure/midnight/blockfrost_url.ts"
@@ -62,6 +58,7 @@ import PrometheusPresentationMetrics from "./infrastructure/observability/promet
 import PrometheusRegistryGauges from "./infrastructure/observability/prometheus_registry_gauges.adapter.ts"
 import PrometheusReportMetrics from "./infrastructure/observability/prometheus_report_metrics.adapter.ts"
 import { redactOutput } from "./infrastructure/observability/redacting_output.ts"
+import PrismaCaseStore from "./infrastructure/postgres/prisma_case_store.adapter.ts"
 import { createPrismaClient } from "./infrastructure/postgres/prisma_client.ts"
 import PrismaCourierFactStore from "./infrastructure/postgres/prisma_courier_fact_store.adapter.ts"
 import PrismaCredentialStore from "./infrastructure/postgres/prisma_credential_store.adapter.ts"
@@ -99,11 +96,17 @@ const meshIdentity = loadMeshIdentity(config.mesh)
 const deliveryFeed = new GrpcDeliveryFeed(config.facts.matchingAddress, meshIdentity, config.facts.callTimeoutSeconds)
 const reviewFeed = new GrpcReviewFeed(config.facts.reviewAddress, meshIdentity, config.facts.callTimeoutSeconds)
 const orderFeed = new GrpcOrderLifecycleFeed(config.facts.orderAddress, meshIdentity, config.facts.callTimeoutSeconds)
+const merchantInfo = new GrpcMerchantInfo(
+  config.identityServiceAddress,
+  meshIdentity,
+  config.identity.timeoutSeconds,
+  logger
+)
+
 const feedMetrics = new PrometheusFeedMetrics(registry)
 const feedLimits = { pageSize: config.facts.pageSize, pagesPerTick: config.facts.pagesPerTick }
 const courierFactStore = new PrismaCourierFactStore(prisma)
 const courierFacts = new CourierFacts(deliveryFeed, reviewFeed, courierFactStore, feedMetrics, logger, feedLimits)
-
 const deliveredOrders = new DeliveredOrders(
   orderFeed,
   new PrismaDeliveredOrderStore(prisma),
@@ -196,10 +199,9 @@ const reportRights = new ReportRights(
 )
 
 const rightGranter = new RightGranter(reportChain, reportRightStore, reportGenerationStore, reportMetrics, logger, now)
-const reportCategoryStore = new PrismaReportCategoryStore(prisma)
 const filedReportStore = new PrismaFiledReportStore(prisma)
 const reportSubmissions = new ReportSubmissions({
-  categories: reportCategoryStore,
+  categories: new PrismaReportCategoryStore(prisma),
   generations: reportGenerationStore,
   reports: filedReportStore,
   inspector: new LedgerReportInspector(),
@@ -217,8 +219,6 @@ const reportKeeper = new ReportKeeper({
   metrics: reportMetrics,
   logger
 })
-
-const reportIpLimiter = new KeyedIpRateLimiter(config.reports.ipLimitMax, config.reports.ipLimitWindowSeconds)
 
 const registryChain = new MidnightCredentialChain({
   payer: sponsor,
@@ -252,10 +252,10 @@ const predicateKeeper = new PredicateKeeper({
   periodDays: config.predicates.periodDays
 })
 
-const tokens = new JoseTokenVerifier(config.identity)
 const server = buildHttpServer({ service, readiness, registry, metrics, logger })
 
-registerCredentialRoutes(server, {
+registerAllRoutes({
+  server,
   credentials: new CourierCredentials(
     courierFactStore,
     credentialStore,
@@ -263,13 +263,6 @@ registerCredentialRoutes(server, {
     credentialMetrics,
     config.credentials.factsMaxAgeSeconds
   ),
-  tokens,
-  logger,
-  metrics,
-  clock: now
-})
-
-registerPredicateRoutes(server, {
   predicates: new PredicateCatalogue({
     chain: registryChain,
     templates: predicateTemplates,
@@ -278,65 +271,37 @@ registerPredicateRoutes(server, {
     logger,
     periodDays: config.predicates.periodDays
   }),
-  tokens,
-  logger,
-  metrics,
-  clock: now
-})
-
-registerRegistrySnapshotRoutes(server, {
-  route: "/api/v1/seal/registry/snapshot",
-  snapshots: new RegistrySnapshots(registryChain, generationStore, registrySnapshotMaxAgeSeconds, now),
-  logger,
-  metrics
-})
-
-registerRegistrySnapshotRoutes(server, {
-  route: "/api/v1/seal/report-registry/snapshot",
-  snapshots: new RegistrySnapshots(registryChain, reportGenerationStore, registrySnapshotMaxAgeSeconds, now),
-  logger,
-  metrics
-})
-
-registerReportRoutes(server, {
+  credentialSnapshots: new RegistrySnapshots(registryChain, generationStore, registrySnapshotMaxAgeSeconds, now),
+  reportSnapshots: new RegistrySnapshots(registryChain, reportGenerationStore, registrySnapshotMaxAgeSeconds, now),
   reporters: new ReporterRegistry(new PrismaReporterStore(prisma), reportMetrics),
-  rights: reportRights,
-  tokens,
-  logger,
-  metrics,
-  clock: now
-})
-
-registerFiledReportRoutes(server, {
-  submissions: reportSubmissions,
-  rateLimiter: reportIpLimiter,
+  reportRights,
+  reportSubmissions,
+  reportIpLimiter: new KeyedIpRateLimiter(config.reports.ipLimitMax, config.reports.ipLimitWindowSeconds),
   reportMetrics,
-  metrics
-})
-
-registerPresentationRoutes(server, {
-  relay: new PresentationRelay({
+  cases: new CaseCatalogue({
+    cases: new PrismaCaseStore(prisma, config.issuerSecret),
+    merchants: merchantInfo,
+    issuerSecret: config.issuerSecret
+  }),
+  presentationRelay: new PresentationRelay({
     inspector: new LedgerPresentationInspector(),
     payer: sponsor,
     generations: generationStore,
     metrics: new PrometheusPresentationMetrics(registry)
   }),
-  statuses: new PresentationStatuses(registryChain, generationStore, presentationStatusMaxAgeSeconds, now),
-  logger,
-  metrics
-})
-
-registerVerifierRoutes(server, {
-  assets: BundleAssets.load(fileURLToPath(new URL("../verifier-bundle/", import.meta.url)), [
+  presentationStatuses: new PresentationStatuses(registryChain, generationStore, presentationStatusMaxAgeSeconds, now),
+  verifierAssets: BundleAssets.load(fileURLToPath(new URL("../verifier-bundle/", import.meta.url)), [
     "verifier.js",
     "verifier.css"
   ]),
-  metrics
-})
-
-registerHolderRoutes(server, {
-  assets: BundleAssets.load(fileURLToPath(new URL("../holder-bundle/", import.meta.url)), ["index.html", "holder.js"]),
-  metrics
+  holderAssets: BundleAssets.load(fileURLToPath(new URL("../holder-bundle/", import.meta.url)), [
+    "index.html",
+    "holder.js"
+  ]),
+  tokens: new JoseTokenVerifier(config.identity),
+  logger,
+  metrics,
+  clock: now
 })
 
 const stops: Array<() => void> = []
@@ -354,6 +319,7 @@ onTermination(
     deliveryFeed.close()
     orderFeed.close()
     reviewFeed.close()
+    merchantInfo.close()
     sponsor.close()
     await prisma.$disconnect()
   },
@@ -370,58 +336,20 @@ await sponsorStatus.refresh()
 stops.push(
   repeat(config.sponsor.pollSeconds, async () => {
     await sponsorStatus.refresh()
-  })
-)
-
-stops.push(
+  }),
   repeat(config.facts.tickSeconds, async () => {
-    await courierFacts.drain().catch((error: unknown) => {
-      logger.error({ message: "the courier facts could not be read" }, error)
-    })
-
-    await deliveredOrders.drain().catch((error: unknown) => {
-      logger.error({ message: "the delivered orders could not be read" }, error)
-    })
-  })
-)
-
-stops.push(
-  repeat(config.registryCheckSeconds, async () => {
-    const condition = sponsorStatus.condition()
-
-    if (condition === "syncing" || condition === "unreachable") {
-      return
-    }
-
-    await registryGenerations.reconcile().catch((error: unknown) => {
-      logger.error({ message: "the credential registry could not be reconciled" }, error)
-    })
-
-    await reportRegistryGenerations.reconcile().catch((error: unknown) => {
-      logger.error({ message: "the report registry could not be reconciled" }, error)
-    })
-  })
-)
-
-stops.push(
-  repeat(config.credentials.issueSeconds, async () => {
-    const condition = sponsorStatus.condition()
-
-    if (condition === "syncing" || condition === "unreachable") {
-      return
-    }
-
-    await credentialIssuer.settle().catch((error: unknown) => {
-      logger.error({ message: "the credential queue could not be settled" }, error)
-    })
-  })
-)
-
-stops.push(
+    await runLogged(logger, "the courier facts could not be read", () => courierFacts.drain())
+    await runLogged(logger, "the delivered orders could not be read", () => deliveredOrders.drain())
+  }),
+  repeatWhenSponsorReady(config.registryCheckSeconds, sponsorStatus, async () => {
+    await runLogged(logger, "the credential registry could not be reconciled", () => registryGenerations.reconcile())
+    await runLogged(logger, "the report registry could not be reconciled", () => reportRegistryGenerations.reconcile())
+  }),
+  repeatWhenSponsorReady(config.credentials.issueSeconds, sponsorStatus, async () => {
+    await runLogged(logger, "the credential queue could not be settled", () => credentialIssuer.settle())
+  }),
   repeat(config.reports.grantSeconds, async () => {
-    await reportRights.addDue().catch((error: unknown) => {
-      logger.error({ message: "the report rights could not be added" }, error)
-    })
+    await runLogged(logger, "the report rights could not be added", () => reportRights.addDue())
 
     const condition = sponsorStatus.condition()
 
@@ -429,36 +357,12 @@ stops.push(
       return
     }
 
-    await rightGranter.settle().catch((error: unknown) => {
-      logger.error({ message: "the report rights could not be granted" }, error)
-    })
-  })
-)
-
-stops.push(
-  repeat(config.predicates.reconcileSeconds, async () => {
-    const condition = sponsorStatus.condition()
-
-    if (condition === "syncing" || condition === "unreachable") {
-      return
-    }
-
-    await predicateKeeper.reconcile().catch((error: unknown) => {
-      logger.error({ message: "the registry's predicates could not be reconciled" }, error)
-    })
-  })
-)
-
-stops.push(
-  repeat(config.reports.keepSeconds, async () => {
-    const condition = sponsorStatus.condition()
-
-    if (condition === "syncing" || condition === "unreachable") {
-      return
-    }
-
-    await reportKeeper.keep().catch((error: unknown) => {
-      logger.error({ message: "filed anonymous reports could not be kept in the registry" }, error)
-    })
+    await runLogged(logger, "the report rights could not be granted", () => rightGranter.settle())
+  }),
+  repeatWhenSponsorReady(config.predicates.reconcileSeconds, sponsorStatus, async () => {
+    await runLogged(logger, "the registry's predicates could not be reconciled", () => predicateKeeper.reconcile())
+  }),
+  repeatWhenSponsorReady(config.reports.keepSeconds, sponsorStatus, async () => {
+    await runLogged(logger, "filed anonymous reports could not be kept in the registry", () => reportKeeper.keep())
   })
 )

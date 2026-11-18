@@ -27,7 +27,11 @@ function statusOf(error: unknown): number {
 }
 
 function buildHttpServer(dependencies: HttpServerDependencies): FastifyInstance {
-  const server = Fastify({ logger: false, genReqId: (request) => requestIdOf(request.headers["x-request-id"]) })
+  const server = Fastify({
+    routerOptions: { maxParamLength: 1536 },
+    logger: false,
+    genReqId: (request) => requestIdOf(request.headers["x-request-id"])
+  })
 
   for (const route of routes) {
     dependencies.metrics.httpRequests.inc({ method: "GET", route, status: "200" }, 0)
